@@ -129,6 +129,7 @@ function PackageInstallTest()
 	}
 
 	$context['uninstalling'] = $_REQUEST['sa'] == 'uninstall';
+	$context['perform_actions_msg'] = $context['uninstalling'] ? $txt['perform_uninstall_actions'] : $txt['perform_actions'];
 
 	// Change our last link tree item for more information on this Packages area.
 	$context['linktree'][count($context['linktree']) - 1] = array(

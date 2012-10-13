@@ -86,6 +86,7 @@ $txt['package_install_action'] = 'Action';
 $txt['package_install_desc'] = 'Description';
 $txt['install_actions'] = 'Install Actions';
 $txt['perform_actions'] = 'Installing this package will perform the following actions:';
+$txt['perform_uninstall_actions'] = 'Uninstalling this package will perform the following actions:';
 $txt['corrupt_compatible'] = 'The package you are trying to download or install is either corrupt or not compatible with this version of SMF.';
 $txt['package_create'] = 'Create';
 $txt['package_move'] = 'Move';

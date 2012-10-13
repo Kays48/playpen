@@ -138,7 +138,7 @@ function template_view_package()
 	else
 	{
 		echo '
-					', $txt['perform_actions'], '
+					', $context['perform_actions_msg'], '
 			</div>
 			<table class="table_grid" width="100%">
 			<thead>
