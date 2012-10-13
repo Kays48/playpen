@@ -2024,19 +2024,7 @@ function parseModification($file, $testing = true, $undo = false, $theme_paths =
 						}
 
 						// The replacement is now the search subject...
-						if ($search['position'] === 'replace' || $search['position'] === 'end')
-							$actual_operation['searches'][$i]['search'] = $search['add'];
-						else
-						{
-							// Reversing a before/after modification becomes a replacement.
-							$actual_operation['searches'][$i]['position'] = 'replace';
-
-							if ($search['position'] === 'before')
-								$actual_operation['searches'][$i]['search'] .= $search['add'];
-							elseif ($search['position'] === 'after')
-								$actual_operation['searches'][$i]['search'] = $search['add'] . $search['search'];
-						}
-
+						$actual_operation['searches'][$i]['search'] = $search['add'];
 						// ...and the search subject is now the replacement.
 						$actual_operation['searches'][$i]['add'] = $search['search'];
 					}
@@ -2080,24 +2068,32 @@ function parseModification($file, $testing = true, $undo = false, $theme_paths =
 					// Before, so the replacement comes after the search subject :P
 					if ($search['position'] === 'before')
 					{
-						$actual_operation['searches'][$i]['preg_search'] = '(' . $actual_operation['searches'][$i]['preg_search'] . ')';
-						$actual_operation['searches'][$i]['preg_replace'] = '$1' . $actual_operation['searches'][$i]['preg_replace'];
+						if ($undo)
+							$actual_operation['searches'][$i]['preg_replace'] = '';
+						else
+						{
+							$actual_operation['searches'][$i]['preg_search'] = '(' . $actual_operation['searches'][$i]['preg_search'] . ')';
+							$actual_operation['searches'][$i]['preg_replace'] = '$1' . $actual_operation['searches'][$i]['preg_replace'];
+						}
 					}
 
 					// After, after what?
 					elseif ($search['position'] === 'after')
 					{
-						$actual_operation['searches'][$i]['preg_search'] = '(' . $actual_operation['searches'][$i]['preg_search'] . ')';
-						$actual_operation['searches'][$i]['preg_replace'] .= '$1';
+						if ($undo)
+							$actual_operation['searches'][$i]['preg_replace'] = '';
+						else
+						{
+							$actual_operation['searches'][$i]['preg_search'] = '(' . $actual_operation['searches'][$i]['preg_search'] . ')';
+							$actual_operation['searches'][$i]['preg_replace'] .= '$1';
+						}
 					}
 
 					// Position the replacement at the end of the file (or just before the closing PHP tags).
 					elseif ($search['position'] === 'end')
 					{
 						if ($undo)
-						{
 							$actual_operation['searches'][$i]['preg_replace'] = '';
-						}
 						else
 						{
 							$actual_operation['searches'][$i]['preg_search'] = '(\\n\\?\\>)?$';
