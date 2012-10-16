@@ -185,11 +185,13 @@ function template_view_package()
 				{
 					// Determine the position text.
 					$operation_text = $operation['position'] == 'replace' ? 'operation_replace' : ($operation['position'] == 'before' ? 'operation_after' : 'operation_before');
+					if ($context['uninstalling'] && $operation['position'] != 'replace')
+						$operation_text = 'remove';
 
 					echo '
 							<tr class="windowbg', $alternate2 ? '' : '2', '">
 								<td width="0"></td>
-								<td width="30" class="smalltext"><a href="' . $scripturl . '?action=admin;area=packages;sa=showoperations;operation_key=', $operation['operation_key'], ';package=', $_REQUEST['package'], ';filename=', $operation['filename'], ($operation['is_boardmod'] ? ';boardmod' : ''), (isset($_REQUEST['sa']) && $_REQUEST['sa'] == 'uninstall' ? ';reverse' : ''), '" onclick="return reqWin(this.href, 680, 400, false);"><img src="', $settings['default_images_url'], '/admin/package_ops.png" alt="" /></a></td>
+								<td width="30" class="smalltext"><a href="' . $scripturl . '?action=admin;area=packages;sa=showoperations;operation_key=', $operation['operation_key'], ';package=', $_REQUEST['package'], ';install_id=', $context['install_id'], ';filename=', $operation['filename'], ($operation['is_boardmod'] ? ';boardmod' : ''), (isset($_REQUEST['sa']) && $_REQUEST['sa'] == 'uninstall' ? ';reverse' : ''), '" onclick="return reqWin(this.href, 680, 400, false);"><img src="', $settings['default_images_url'], '/admin/package_ops.png" alt="" /></a></td>
 								<td width="30" class="smalltext">', $operation_num, '.</td>
 								<td width="23%" class="smalltext">', $txt[$operation_text], '</td>
 								<td width="50%" class="smalltext">', $operation['action'], '</td>
@@ -225,11 +227,12 @@ function template_view_package()
 					', $context['uninstalling'] ? $txt['package_other_themes_uninstall'] : $txt['package_other_themes'], '
 				</h3>
 			</div>
-			<div id="custom_changes">
+			<div id="custom_changes">',
+			$context['uninstalling'] ? '' : '
 				<div class="information">
-					', $txt['package_other_themes_desc'], '
-				</div>
-				<table class="table_grid" width="100%">';
+					' . $txt['package_other_themes_desc'] . '
+				</div>',
+				'<table class="table_grid" width="100%">';
 
 			// Loop through each theme and display it's name, and then it's details.
 			foreach ($context['theme_actions'] as $id => $theme)
@@ -279,11 +282,13 @@ function template_view_package()
 						{
 							// Determine the possition text.
 							$operation_text = $operation['position'] == 'replace' ? 'operation_replace' : ($operation['position'] == 'before' ? 'operation_after' : 'operation_before');
+							if ($context['uninstalling'] && $operation['position'] != 'replace')
+								$operation_text = 'remove';
 
 							echo '
 								<tr class="windowbg', $alternate2 ? '' : '2', '">
 									<td width="0"></td>
-									<td width="30" class="smalltext"><a href="' . $scripturl . '?action=admin;area=packages;sa=showoperations;operation_key=', $operation['operation_key'], ';package=', $_REQUEST['package'], ';filename=', $operation['filename'], ($operation['is_boardmod'] ? ';boardmod' : ''), (isset($_REQUEST['sa']) && $_REQUEST['sa'] == 'uninstall' ? ';reverse' : ''), '" onclick="return reqWin(this.href, 600, 400, false);"><img src="', $settings['default_images_url'], '/admin/package_ops.png" alt="" /></a></td>
+									<td width="30" class="smalltext"><a href="' . $scripturl . '?action=admin;area=packages;sa=showoperations;operation_key=', $operation['operation_key'], ';package=', $_REQUEST['package'], ';install_id=', $context['install_id'], ';filename=', $operation['filename'], ($operation['is_boardmod'] ? ';boardmod' : ''), (isset($_REQUEST['sa']) && $_REQUEST['sa'] == 'uninstall' ? ';reverse' : ''), '" onclick="return reqWin(this.href, 680, 400, false);"><img src="', $settings['default_images_url'], '/admin/package_ops.png" alt="" /></a></td>
 									<td width="30" class="smalltext">', $operation_num, '.</td>
 									<td width="23%" class="smalltext">', $txt[$operation_text], '</td>
 									<td width="50%" class="smalltext">', $operation['action'], '</td>

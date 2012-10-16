@@ -1803,6 +1803,28 @@ function ViewOperations()
 	while ($row = $smcFunc['db_fetch_assoc']($request))
 		$theme_paths[$row['id_theme']][$row['variable']] = $row['value'];
 	$smcFunc['db_free_result']($request);
+ 
+	// If we're viewing uninstall operations, only consider themes that
+	// the package is actually installed into.
+	if (isset($_REQUEST['reverse'])) {
+		$request = $smcFunc['db_query']('', '
+			SELECT themes_installed
+			FROM {db_prefix}log_packages
+			WHERE id_install = {int:install_id}
+			LIMIT 1',
+			array(
+				'install_id' => $_REQUEST['install_id'],
+			)
+		);
+
+		list ($installed_themes) = $smcFunc['db_fetch_row']($request);
+		$smcFunc['db_free_result']($request);
+		
+		$installed_themes = explode(',', $installed_themes);
+		foreach ($theme_paths as $id => $data)
+			if ($id != 1 && !in_array($id, $installed_themes))
+				unset($theme_paths[$id]);
+	}
 
 	// Boardmod?
 	if (isset($_REQUEST['boardmod']))
@@ -1817,10 +1839,19 @@ function ViewOperations()
 		'position' => $mod_actions[$_REQUEST['operation_key']]['position'],
 	);
 
-	// Let's do some formatting...
-	$operation_text = $context['operations']['position'] == 'replace' ? 'operation_replace' : ($context['operations']['position'] == 'before' ? 'operation_after' : 'operation_before');
-	$context['operations']['search'] = parse_bbc('[code=' . $txt['operation_find'] . ']' . ($context['operations']['position'] == 'end' ? '?&gt;' : $context['operations']['search']) . '[/code]');
-	$context['operations']['replace'] = parse_bbc('[code=' . $txt[$operation_text] . ']' . $context['operations']['replace'] . '[/code]');
+	if ($reverse && $context['operations']['position'] != 'replace' && !isset($_REQUEST['boardmod']))
+	{
+		// Just show the code which needs to be removed.
+		$context['operations']['search'] = parse_bbc('[code=' . $txt['operation_find_remove'] . ']' . $context['operations']['search'] . '[/code]');
+		$context['operations']['replace'] = '';
+	}
+	else
+	{
+		// Let's do some formatting first...
+		$operation_text = $context['operations']['position'] == 'replace' ? 'operation_replace' : ($context['operations']['position'] == 'before' ? 'operation_after' : 'operation_before');
+		$context['operations']['search'] = parse_bbc('[code=' . $txt['operation_find'] . ']' . ($context['operations']['position'] == 'end' ? '?&gt;' : $context['operations']['search']) . '[/code]');
+		$context['operations']['replace'] = parse_bbc('[code=' . $txt[$operation_text] . ']' . $context['operations']['replace'] . '[/code]');
+	}
 
 	// No layers
 	$context['template_layers'] = array();

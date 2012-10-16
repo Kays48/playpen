@@ -203,6 +203,7 @@ $txt['package_emulate_desc'] = 'Sometimes packages are locked to early versions 
 
 // Operations.
 $txt['operation_find'] = 'Find';
+$txt['operation_find_remove'] = 'Find and remove';
 $txt['operation_replace'] = 'Replace';
 $txt['operation_after'] = 'Add After';
 $txt['operation_before'] = 'Add Before';
