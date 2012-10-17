@@ -1647,25 +1647,17 @@ function scheduled_paid_subscriptions()
  */
 function scheduled_remove_temp_attachments()
 {
-	global $modSettings;
+	global $modSettings, $txt;
 
 	// We need to know where this thing is going.
-	if (!empty($modSettings['currentAttachmentUploadDir']))
-	{
-		if (!is_array($modSettings['attachmentUploadDir']))
-			$modSettings['attachmentUploadDir'] = unserialize($modSettings['attachmentUploadDir']);
+	if (!is_array($modSettings['attachmentUploadDir']))
+		$modSettings['attachmentUploadDir'] = unserialize($modSettings['attachmentUploadDir']);
 
-		// Just use the current path for temp files.
-		$attach_dirs = $modSettings['attachmentUploadDir'];
-	}
-	else
-	{
-		$attach_dirs = array($modSettings['attachmentUploadDir']);
-	}
+	// Just use the current path for temp files.
+	$attach_dir = $modSettings['attachmentUploadDir'][$modSettings['currentAttachmentUploadDir']];
 
-	foreach ($attach_dirs as $attach_dir)
+	if ($dir = @opendir($attach_dir))
 	{
-		$dir = @opendir($attach_dir) or fatal_lang_error('cant_access_upload_path', 'critical');
 		while ($file = readdir($dir))
 		{
 			if ($file == '.' || $file == '..')
@@ -1680,6 +1672,14 @@ function scheduled_remove_temp_attachments()
 		}
 		closedir($dir);
 	}
+	else
+	{
+		loadLanguage('Post');
+		log_error($txt['cant_access_upload_path'], 'critical');
+		return false;
+	}
+	
+	return true;
 }
 
 /**
