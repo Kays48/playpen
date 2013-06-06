@@ -2639,7 +2639,7 @@ function profileSaveAvatarData(&$value)
 		$uploadDir = $modSettings['custom_avatar_dir'];
 		$id_folder = 1;
 	}
-	elseif (!empty($modSettings['currentAttachmentUploadDir']))
+	else
 	{
 		if (!is_array($modSettings['attachmentUploadDir']))
 			$modSettings['attachmentUploadDir'] = unserialize($modSettings['attachmentUploadDir']);
@@ -2647,11 +2647,6 @@ function profileSaveAvatarData(&$value)
 		// Just use the current path for temp files.
 		$uploadDir = $modSettings['attachmentUploadDir'][$modSettings['currentAttachmentUploadDir']];
 		$id_folder = $modSettings['currentAttachmentUploadDir'];
-	}
-	else
-	{
-		$uploadDir = $modSettings['attachmentUploadDir'];
-		$id_folder = 1;
 	}
 
 	$downloadedExternalAvatar = false;

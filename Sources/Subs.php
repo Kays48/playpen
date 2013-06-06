@@ -3099,17 +3099,10 @@ function template_header()
 			}
 
 			// We are already checking so many files...just few more doesn't make any difference! :P
-			if (!empty($modSettings['currentAttachmentUploadDir']))
-			{
-				if (!is_array($modSettings['attachmentUploadDir']))
-					$modSettings['attachmentUploadDir'] = @unserialize($modSettings['attachmentUploadDir']);
-				$path = $modSettings['attachmentUploadDir'][$modSettings['currentAttachmentUploadDir']];
-			}
-			else
-			{
-				$path = $modSettings['attachmentUploadDir'];
-				$id_folder_thumb = 1;
-			}
+			if (!is_array($modSettings['attachmentUploadDir']))
+				$modSettings['attachmentUploadDir'] = @unserialize($modSettings['attachmentUploadDir']);
+			$path = $modSettings['attachmentUploadDir'][$modSettings['currentAttachmentUploadDir']];
+
 			secureDirectory($path, true);
 			secureDirectory($cachedir);
 
@@ -3267,15 +3260,10 @@ function getAttachmentFilename($filename, $attachment_id, $dir = null, $new = fa
 	if (empty($file_hash))
 		return getLegacyAttachmentFilename($filename, $attachment_id, $dir, $new);
 
-	// Are we using multiple directories?
-	if (!empty($modSettings['currentAttachmentUploadDir']))
-	{
-		if (!is_array($modSettings['attachmentUploadDir']))
-			$modSettings['attachmentUploadDir'] = unserialize($modSettings['attachmentUploadDir']);
-		$path = $modSettings['attachmentUploadDir'][$dir];
-	}
-	else
-		$path = $modSettings['attachmentUploadDir'];
+	// Since we using multiple directories?
+	if (!is_array($modSettings['attachmentUploadDir']))
+		$modSettings['attachmentUploadDir'] = unserialize($modSettings['attachmentUploadDir']);
+	$path = $modSettings['attachmentUploadDir'][$dir];
 
 	return $path . '/' . $attachment_id . '_' . $file_hash;
 }
@@ -3316,15 +3304,10 @@ function getLegacyAttachmentFilename($filename, $attachment_id, $dir = null, $ne
 	elseif ($new)
 		return $enc_name;
 
-	// Are we using multiple directories?
-	if (!empty($modSettings['currentAttachmentUploadDir']))
-	{
-		if (!is_array($modSettings['attachmentUploadDir']))
-			$modSettings['attachmentUploadDir'] = unserialize($modSettings['attachmentUploadDir']);
-		$path = $modSettings['attachmentUploadDir'][$dir];
-	}
-	else
-		$path = $modSettings['attachmentUploadDir'];
+	// We are using multiple directories...
+	if (!is_array($modSettings['attachmentUploadDir']))
+		$modSettings['attachmentUploadDir'] = unserialize($modSettings['attachmentUploadDir']);
+	$path = $modSettings['attachmentUploadDir'][$dir];
 
 	if (file_exists($path . '/' . $enc_name))
 		$filename = $path . '/' . $enc_name;
@@ -4140,5 +4123,15 @@ function sanitizeMSCutPaste($string)
 
 	return $string;
 }
+
+// replace 1
+
+// replace 2
+
+/////////////////
+
+// anchor
+
+/////////////////
 
 ?>
