@@ -7,14 +7,14 @@
  *
  * @package SMF
  * @author Simple Machines http://www.simplemachines.org
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
  */
 
 if (!defined('SMF'))
-	die('Hacking attempt...');
+	die('No direct access...');
 
 /**
  * Entry point for the moderation center.
@@ -154,21 +154,6 @@ function ModerationMain($dont_call = false)
 		),
 	);
 
-	// Any files to include for moderation?
-	if (!empty($modSettings['integrate_moderate_include']))
-	{
-		$moderate_includes = explode(',', $modSettings['integrate_moderate_include']);
-		foreach ($moderate_includes as $include)
-		{
-			$include = strtr(trim($include), array('$boarddir' => $boarddir, '$sourcedir' => $sourcedir, '$themedir' => $settings['theme_dir']));
-			if (file_exists($include))
-				require_once($include);
-		}
-	}
-
-	// Let them modify admin areas easily.
-	call_integration_hook('integrate_moderate_areas', array(&$moderation_areas));
-
 	// Make sure the administrator has a valid session...
 	validateSession('moderate');
 
@@ -187,6 +172,15 @@ function ModerationMain($dont_call = false)
 	// Retain the ID information in case required by a subaction.
 	$context['moderation_menu_id'] = $context['max_menu_id'];
 	$context['moderation_menu_name'] = 'menu_data_' . $context['moderation_menu_id'];
+
+	// @todo: html in here is not good
+	$context[$context['moderation_menu_name']]['tab_data'] = array(
+		'title' => $txt['moderation_center'],
+		'help' => '',
+		'description' => '
+			<strong>' . $txt['hello_guest'] . ' ' . $context['user']['name'] . '!</strong>
+			<br /><br />
+			' . $txt['mc_description']);
 
 	// What a pleasant shortcut - even tho we're not *really* on the admin screen who cares...
 	$context['admin_area'] = $mod_include_data['current_area'];
@@ -225,7 +219,7 @@ function ModerationHome()
 	global $txt, $context, $scripturl, $modSettings, $user_info, $user_settings;
 
 	loadTemplate('ModerationCenter');
-	loadJavascriptFile('scripts/admin.js?alp21', array('default_theme' => true));
+	loadJavascriptFile('admin.js', array('default_theme' => true), 'admin.js');
 
 	$context['page_title'] = $txt['moderation_center'];
 	$context['sub_template'] = 'moderation_center';
@@ -895,7 +889,7 @@ function ModReport()
 	{
 		$context['report']['comments'][] = array(
 			'id' => $row['id_comment'],
-			'message' => $row['comment'],
+			'message' => strtr($row['comment'], array("\n" => '<br />')),
 			'time' => timeformat($row['time_sent']),
 			'member' => array(
 				'id' => $row['id_member'],
@@ -1143,7 +1137,7 @@ function ViewWatchedUsers()
 			$approve_query = ' AND m.id_board IN (' . implode(',', $approve_boards) . ')';
 		// Nada, zip, etc...
 		else
-			$approve_query = ' AND 0';
+			$approve_query = ' AND 1=0';
 	}
 
 	require_once($sourcedir . '/Subs-List.php');
@@ -1804,6 +1798,7 @@ function ViewWarningTemplates()
 				'header' => array(
 					'value' => '<input type="checkbox" class="input_check" onclick="invertAll(this, this.form);" />',
 					'style' => 'width: 4%;',
+					'class' => 'centercol',
 				),
 				'data' => array(
 					'function' => create_function('$rowData', '
@@ -1811,7 +1806,7 @@ function ViewWarningTemplates()
 
 						return \'<input type="checkbox" name="deltpl[]" value="\' . $rowData[\'id_comment\'] . \'" class="input_check" />\';
 					'),
-					'style' => 'text-align: center;',
+					'class' => 'centercol',
 				),
 			),
 		),
@@ -1823,13 +1818,10 @@ function ViewWarningTemplates()
 			array(
 				'position' => 'below_table_data',
 				'value' => '&nbsp;<input type="submit" name="delete" value="' . $txt['mc_warning_template_delete'] . '" onclick="return confirm(\'' . $txt['mc_warning_template_delete_confirm'] . '\');" class="button_submit" />',
-				'style' => 'text-align: right;',
 			),
 			array(
 				'position' => 'bottom_of_list',
-				'value' => '
-					<input type="submit" name="add" value="' . $txt['mc_warning_template_add'] . '" class="button_submit" />',
-				'style' => 'text-align: right;',
+				'value' => '<input type="submit" name="add" value="' . $txt['mc_warning_template_add'] . '" class="button_submit" />',
 			),
 		),
 	);
@@ -2067,6 +2059,11 @@ function ModerationSettings()
 	loadTemplate('ModerationCenter');
 	$context['page_title'] = $txt['mc_settings'];
 	$context['sub_template'] = 'moderation_settings';
+	$context[$context['moderation_menu_name']]['tab_data'] = array(
+		'title' => $txt['mc_prefs_title'],
+		'help' => '',
+		'description' => $txt['mc_prefs_desc']
+	);
 
 	// What blocks can this user see?
 	$context['homepage_blocks'] = array(
@@ -2164,7 +2161,7 @@ function ModEndSession()
 		if (strpos($key, '-mod') !== false)
 			unset($_SESSION['token'][$key]);
 
-	redirectexit('?action=moderate');
+	redirectexit('action=moderate');
 }
 
 ?>

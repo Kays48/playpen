@@ -7,14 +7,14 @@
  *
  * @package SMF
  * @author Simple Machines http://www.simplemachines.org
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
  */
 
 if (!defined('SMF'))
-	die('Hacking attempt...');
+	die('No direct access...');
 
 /**
  *  Add the file functions to the $smcFunc array.
@@ -49,7 +49,7 @@ function smf_db_search_support($search_type)
  *
  * @param string $identifier
  * @param string $db_string
- * @param array $db_values, default array()
+ * @param array $db_values default array()
  * @param resource $connection
  */
 function smf_db_search_query($identifier, $db_string, $db_values = array(), $connection = null)

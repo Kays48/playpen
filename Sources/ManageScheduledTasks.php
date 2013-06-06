@@ -7,14 +7,14 @@
  *
  * @package SMF
  * @author Simple Machines http://www.simplemachines.org
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
  */
 
 if (!defined('SMF'))
-	die('Hacking attempt...');
+	die('No direct access...');
 
 /**
  * Scheduled tasks management dispatcher. This function checks permissions and delegates
@@ -207,6 +207,7 @@ function ScheduledTasks()
 				'header' => array(
 					'value' => $txt['scheduled_tasks_enabled'],
 					'style' => 'width: 6%;',
+					'class' => 'centercol',
 				),
 				'data' => array(
 					'sprintf' => array(
@@ -217,13 +218,14 @@ function ScheduledTasks()
 							'checked_state' => false,
 						),
 					),
-					'style' => 'text-align: center;',
+					'class' => 'centercol',
 				),
 			),
 			'run_now' => array(
 				'header' => array(
 					'value' => $txt['scheduled_tasks_run_now'],
 					'style' => 'width: 12%;',
+					'class' => 'centercol',
 				),
 				'data' => array(
 					'sprintf' => array(
@@ -233,7 +235,7 @@ function ScheduledTasks()
 							'id' => false,
 						),
 					),
-					'style' => 'text-align: center;',
+					'class' => 'centercol',
 				),
 			),
 		),
@@ -246,8 +248,6 @@ function ScheduledTasks()
 				'value' => '
 					<input type="submit" name="save" value="' . $txt['scheduled_tasks_save_changes'] . '" class="button_submit" />
 					<input type="submit" name="run" value="' . $txt['scheduled_tasks_run_now'] . '" class="button_submit" />',
-				'class' => 'floatright',
-				'style' => 'text-align: right;',
 			),
 			array(
 				'position' => 'after_title',
@@ -502,7 +502,6 @@ function TaskLog()
 				'position' => 'below_table_data',
 				'value' => '
 					<input type="submit" name="removeAll" value="' . $txt['scheduled_log_empty_log'] . '" onclick="return confirm(\'' . $txt['scheduled_log_empty_log_confirm'] . '\');" class="button_submit" />',
-				'style' => 'text-align: right;',
 			),
 			array(
 				'position' => 'after_title',

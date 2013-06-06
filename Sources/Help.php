@@ -7,14 +7,14 @@
  *
  * @package SMF
  * @author Simple Machines http://www.simplemachines.org
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
  */
 
 if (!defined('SMF'))
-	die('Hacking attempt...');
+	die('No direct access...');
 
 /**
  * Redirect to the user help ;).
@@ -84,7 +84,7 @@ function ShowAdminHelp()
 		loadLanguage('ManagePermissions');
 
 	loadTemplate('Help');
-	
+
 	// Allow mods to load their own language file here
  	call_integration_hook('integrate_helpadmin');
 

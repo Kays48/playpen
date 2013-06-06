@@ -5,15 +5,22 @@
  *
  * @package SMF
  * @author Simple Machines http://www.simplemachines.org
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
  */
 
 if (!defined('SMF'))
-	die('Hacking attempt...');
+	die('No direct access...');
 
+/**
+ * Generates the query to determine the list of available boards for a user
+ * Executes the query and returns the list
+ *
+ * @param type $boardListOptions
+ * @return type
+ */
 function getBoardList($boardListOptions = array())
 {
 	global $smcFunc, $user_info;

@@ -4,7 +4,7 @@
  *
  * @package SMF
  * @author Simple Machines
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
@@ -43,19 +43,15 @@ function template_browse()
 			<h3 class="catbg">', $txt['attachment_manager_browse_files'], '</h3>
 		</div>
 		<div class="windowbg2">
-			<span class="topslice"><span></span></span>
 			<div class="content">
 				<a href="', $scripturl, '?action=admin;area=manageattachments;sa=browse">', $context['browse_type'] === 'attachments' ? '<img src="' . $settings['images_url'] . '/selected.png" alt="&gt;" /> ' : '', $txt['attachment_manager_attachments'], '</a> |
 				<a href="', $scripturl, '?action=admin;area=manageattachments;sa=browse;avatars">', $context['browse_type'] === 'avatars' ? '<img src="' . $settings['images_url'] . '/selected.png" alt="&gt;" /> ' : '', $txt['attachment_manager_avatars'], '</a> |
 				<a href="', $scripturl, '?action=admin;area=manageattachments;sa=browse;thumbs">', $context['browse_type'] === 'thumbs' ? '<img src="' . $settings['images_url'] . '/selected.png" alt="&gt;" /> ' : '', $txt['attachment_manager_thumbs'], '</a>
 			</div>
-			<span class="botslice"><span></span></span>
 		</div>
 	</div>';
 
 	template_show_list('file_list');
-	echo '
-	<br class="clear" />';
 
 }
 
@@ -69,7 +65,6 @@ function template_maintenance()
 			<h3 class="catbg">', $txt['attachment_stats'], '</h3>
 		</div>
 		<div class="windowbg">
-			<span class="topslice"><span></span></span>
 			<div class="content">
 				<dl class="settings">
 					<dt><strong>', $txt['attachment_total'], ':</strong></dt><dd>', $context['num_attachments'], '</dd>
@@ -82,14 +77,12 @@ function template_maintenance()
 					<dt><strong>', $txt['attachment_files'], ':</strong></dt><dd>', isset($context['attachment_files']) ? $context['attachment_files'] : $txt['attachmentdir_files_not_set'], '</dd>
 				</dl>
 			</div>
-			<span class="botslice"><span></span></span>
 		</div>
-		<br class="clear" />
+
 		<div class="cat_bar">
 			<h3 class="catbg">', $txt['attachment_integrity_check'], '</h3>
 		</div>
 		<div class="windowbg">
-			<span class="topslice"><span></span></span>
 			<div class="content">
 				<form action="', $scripturl, '?action=admin;area=manageattachments;sa=repair;', $context['session_var'], '=', $context['session_id'], '" method="post" accept-charset="', $context['character_set'], '">
 					<p>', $txt['attachment_integrity_check_desc'], '</p>
@@ -98,14 +91,11 @@ function template_maintenance()
 					<br class="clear_right" />
 				</form>
 			</div>
-			<span class="botslice"><span></span></span>
 		</div>
-		<br class="clear" />
 		<div class="cat_bar">
 			<h3 class="catbg">', $txt['attachment_pruning'], '</h3>
 		</div>
 		<div class="windowbg">
-			<span class="topslice"><span></span></span>
 			<div class="content">
 				<form action="', $scripturl, '?action=admin;area=manageattachments" method="post" accept-charset="', $context['character_set'], '" onsubmit="return confirm(\'', $txt['attachment_pruning_warning'], '\');" style="margin: 0 0 2ex 0;">
 					', $txt['attachment_remove_old'], ' <input type="text" name="age" value="25" size="4" class="input_text" /> ', $txt['days_word'], '<br />
@@ -133,14 +123,11 @@ function template_maintenance()
 					<input type="hidden" name="type" value="avatars" />
 					<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
 					<input type="hidden" name="sa" value="byAge" />
-					<br class="clear_right" />
 				</form>
 			</div>
-			<span class="botslice"><span></span></span>
 		</div>
-	</div>
-	<br class="clear" />';
-	
+	</div>';
+
 	echo '
 			<div id="transfer" class="cat_bar">
 				<h3 class="catbg">', $txt['attachment_transfer'], '</h3>
@@ -185,7 +172,7 @@ function template_maintenance()
 							<dd><select name="to">
 								<option value="0">', $txt['attachment_transfer_select'], '</option>';
 
-	foreach($context['attach_dirs'] as $id => $dir)
+	foreach ($context['attach_dirs'] as $id => $dir)
 		echo '
 								<option value="', $id, '">', $dir, '</option>';
 	echo '
@@ -238,11 +225,9 @@ function template_attachment_repair()
 			<h3 class="catbg">', $txt['repair_attachments_complete'], '</h3>
 		</div>
 		<div class="windowbg">
-			<span class="topslice"><span></span></span>
 			<div class="content">
 				', $txt['repair_attachments_complete_desc'], '
 			</div>
-			<span class="botslice"><span></span></span>
 		</div>
 	</div>
 	<br class="clear" />';
@@ -257,11 +242,9 @@ function template_attachment_repair()
 			<h3 class="catbg">', $txt['repair_attachments_complete'], '</h3>
 		</div>
 		<div class="windowbg">
-			<span class="topslice"><span></span></span>
 			<div class="content">
 				', $txt['repair_attachments_no_errors'], '
 			</div>
-			<span class="botslice"><span></span></span>
 		</div>
 	</div>
 	<br class="clear" />';
@@ -271,12 +254,11 @@ function template_attachment_repair()
 	{
 		echo '
 	<div id="manage_attachments">
-		<form action="', $scripturl, '?action=admin;area=manageattachments;sa=repair;fixErrors=1;step=0;substep=0;', $context['session_var'], '=', $context['session_id'], '" method="post" accept-charset="', $context['character_set'], '">
+		<form id="admin_form_wrapper" action="', $scripturl, '?action=admin;area=manageattachments;sa=repair;fixErrors=1;step=0;substep=0;', $context['session_var'], '=', $context['session_id'], '" method="post" accept-charset="', $context['character_set'], '">
 			<div class="cat_bar">
 				<h3 class="catbg">', $txt['repair_attachments'], '</h3>
 			</div>
 			<div class="windowbg">
-				<span class="topslice"><span></span></span>
 				<div class="content">
 					<p>', $txt['repair_attachments_error_desc'], '</p>';
 
@@ -293,7 +275,6 @@ function template_attachment_repair()
 					<input type="submit" value="', $txt['repair_attachments_continue'], '" class="button_submit" />
 					<input type="submit" name="cancel" value="', $txt['repair_attachments_cancel'], '" class="button_submit" />
 				</div>
-				<span class="botslice"><span></span></span>
 			</div>
 		</form>
 	</div>
@@ -308,7 +289,6 @@ function template_attachment_paths()
 	if (!empty($modSettings['attachment_basedirectories']))
 	{
 		template_show_list('base_paths');
-		echo '<br />';
 	}
 
 	template_show_list('attach_paths');

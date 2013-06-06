@@ -1,4 +1,4 @@
-/*
+/**
  * SMFtooltip, Basic JQuery function to provide styled tooltips
  *
  * - will use the hoverintent plugin if available
@@ -11,7 +11,7 @@
  *
  * @package SMF
  * @author Simple Machines http://www.simplemachines.org
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
@@ -25,18 +25,20 @@
 			hoverIntent: {sensitivity: 10, interval: 300, timeout: 50},
 			positionTop: 12,
 			positionLeft: 12,
-			tooltipID: 'smf_tooltip',
-			tooltipClass: 'tooltip',
-			tooltipTextID: 'smf_tooltipText'
+			tooltipID: 'smf_tooltip', // ID used on the outer div
+			tooltipTextID: 'smf_tooltipText', // as above but on the inner div holding the text
+			tooltipClass: 'tooltip', // The class applied to the outer div (that displays on hover), use this in your css
+			tooltipSwapClass: 'smf_swaptip', // a class only used internally, change only if you have a conflict
+			tooltipContent: 'html' // display captured title text as html or text
 		};
-		
+
 		// account for any user options
 		var oSettings = $.extend({}, $.fn.SMFtooltip.oDefaultsSettings , oInstanceSettings || {});
 
 		// move passed selector titles to a hidden span, then remove the selector title to prevent any default browser actions
 		$(this).each(function()
 		{
-			var sTitle = $('<span class="' + oSettings.tooltipClass + '">' + this.title + '</span>').hide();
+			var sTitle = $('<span class="' + oSettings.tooltipSwapClass + '">' + htmlspecialchars(this.title) + '</span>').hide();
 			$(this).append(sTitle).attr('title', '');
 		});
 		
@@ -105,6 +107,12 @@
 			$('#' + oSettings.tooltipID).fadeOut('slow').trigger("unload").remove();
 		}
 		
+		// used to keep html encoded
+		function htmlspecialchars(string)
+		{
+			return $('<span>').text(string).html();
+		}
+		
 		// for all of the elements that match the selector on the page, lets set up some actions
 		return this.each(function(index)
 		{
@@ -128,21 +136,25 @@
 			// create the on tip action
 			function smf_tooltip_on(event)
 			{
-				// Grab the text from the hidden span element we created on page load
-				if ($(this).children('.' + oSettings.tooltipClass).text())
+				// If we have text in the hidden span element we created on page load
+				if ($(this).children('.' + oSettings.tooltipSwapClass).text())
 				{
 					// create a ID'ed div with our style class that holds the tooltip info, hidden for now
 					$('body').append('<div id="' + oSettings.tooltipID + '" class="' + oSettings.tooltipClass + '"><div id="' + oSettings.tooltipTextID + '" style="display:none;"></div></div>');
 					
 					// load information in to our newly created div
-					var $tt = $('#' + oSettings.tooltipID);
-					var $ttContent = $('#' + oSettings.tooltipID + ' #' + oSettings.tooltipTextID);
-				
-					// set the text in the div
-					$ttContent.text($(this).children('.' + oSettings.tooltipClass).text());
-					$tt.show();
+					var tt = $('#' + oSettings.tooltipID);
+					var ttContent = $('#' + oSettings.tooltipID + ' #' + oSettings.tooltipTextID);
+					
+					if (oSettings.tooltipContent == 'html')
+						ttContent.html($(this).children('.' + oSettings.tooltipSwapClass).html());
+					else
+						ttContent.text($(this).children('.' + oSettings.tooltipSwapClass).text());
+					
+					oSettings.tooltipContent
 					
 					// show then position or it may postion off screen
+					tt.show();
 					showTooltip();
 					positionTooltip(event);
 				}
@@ -165,6 +177,13 @@
 					return false;
 				});
 			}
+			
+			// clear the tip on a click
+			$(this).bind("click", function(event){
+				hideTooltip(this);
+				return true;
+			});
+
 		});
 	};
 	
@@ -180,8 +199,7 @@
  * <http://cherne.net/brian/resources/jquery.hoverIntent.html>
  * 
  * hoverIntent is currently available for use in all personal or commercial 
- * projects under both MIT and GPL licenses. This means that you can choose 
- * the license that best suits your project, and use it accordingly.
+ * projects under MIT license.
  * 
  * // basic usage (just like .hover) receives onMouseOver and onMouseOut functions
  * $("ul li").hoverIntent( showNav , hideNav );
@@ -303,9 +321,8 @@
  * Superfish v1.4.8 - jQuery menu widget
  * Copyright (c) 2008 Joel Birch
  *
- * Dual licensed under the MIT and GPL licenses:
+ * Licensed under the MIT license:
  * 	http://www.opensource.org/licenses/mit-license.php
- * 	http://www.gnu.org/licenses/gpl.html
  *
  * CHANGELOG: http://users.tpg.com.au/j_birch/plugins/superfish/changelog.txt
  */
@@ -428,4 +445,117 @@
 		}
 	});
 
+})(jQuery);
+
+/**
+ * AnimaDrag
+ * Animated jQuery Drag and Drop Plugin
+ * Version 0.5.1 beta
+ * Author Abel Mohler
+ * Released with the MIT License: http://www.opensource.org/licenses/mit-license.php
+ */
+(function($){
+	$.fn.animaDrag = function(o, callback) {
+		var defaults = {
+			speed: 400,
+			interval: 300,
+			easing: null,
+			cursor: 'move',
+			boundary: document.body,
+			grip: null,
+			overlay: true,
+			after: function(e) {},
+			during: function(e) {},
+			before: function(e) {},
+			afterEachAnimation: function(e) {}
+		}
+		if(typeof callback == 'function') {
+				defaults.after = callback;
+		}
+		o = $.extend(defaults, o || {});
+		return this.each(function() {
+			var id, startX, startY, draggableStartX, draggableStartY, dragging = false, Ev, draggable = this,
+			grip = ($(this).find(o.grip).length > 0) ? $(this).find(o.grip) : $(this);
+			if(o.boundary) {
+				var limitTop = $(o.boundary).offset().top, limitLeft = $(o.boundary).offset().left,
+				limitBottom = limitTop + $(o.boundary).innerHeight(), limitRight = limitLeft + $(o.boundary).innerWidth();
+			}
+			grip.mousedown(function(e) {
+				o.before.call(draggable, e);
+
+				var lastX, lastY;
+				dragging = true;
+
+				Ev = e;
+
+				startX = lastX = e.pageX;
+				startY = lastY = e.pageY;
+				draggableStartX = $(draggable).offset().left;
+				draggableStartY = $(draggable).offset().top;
+
+				$(draggable).css({
+					position: 'absolute',
+					left: draggableStartX + 'px',
+					top: draggableStartY + 'px',
+					cursor: o.cursor,
+					zIndex: '1010'
+				}).addClass('anima-drag').appendTo(document.body);
+				if(o.overlay && $('#anima-drag-overlay').length == 0) {
+					$('<div id="anima-drag-overlay"></div>').css({
+						position: 'absolute',
+						top: '0',
+						left: '0',
+						zIndex: '1000',
+						width: $(document.body).outerWidth() + 'px',
+						height: $(document.body).outerHeight() + 'px'
+					}).appendTo(document.body);
+				}
+				else if(o.overlay) {
+					$('#anima-drag-overlay').show();
+				}
+				id = setInterval(function() {
+					if(lastX != Ev.pageX || lastY != Ev.pageY) {
+						var positionX = draggableStartX - (startX - Ev.pageX), positionY = draggableStartY - (startY - Ev.pageY);
+						if(positionX < limitLeft && o.boundary) {
+							positionX = limitLeft;
+						}
+						else if(positionX + $(draggable).innerWidth() > limitRight && o.boundary) {
+							positionX = limitRight - $(draggable).outerWidth();
+						}
+						if(positionY < limitTop && o.boundary) {
+							positionY = limitTop;
+						}
+						else if(positionY + $(draggable).innerHeight() > limitBottom && o.boundary) {
+							positionY = limitBottom - $(draggable).outerHeight();
+						}
+						$(draggable).stop().animate({
+							left: positionX + 'px',
+							top: positionY + 'px'
+						}, o.speed, o.easing, function(){o.afterEachAnimation.call(draggable, Ev)});
+					}
+					lastX = Ev.pageX;
+					lastY = Ev.pageY;
+				}, o.interval);
+				($.browser.safari || e.preventDefault());
+			});
+			$(document).mousemove(function(e) {
+				if(dragging) {
+					Ev = e;
+					o.during.call(draggable, e);
+				}
+			});
+			$(document).mouseup(function(e) {
+				if(dragging) {
+					$(draggable).css({
+						cursor: '',
+						zIndex: '990'
+					}).removeClass('anima-drag');
+					$('#anima-drag-overlay').hide().appendTo(document.body);
+					clearInterval(id);
+					o.after.call(draggable, e);
+					dragging = false;
+				}
+			});
+		});
+	}
 })(jQuery);

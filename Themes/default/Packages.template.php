@@ -4,7 +4,7 @@
  *
  * @package SMF
  * @author Simple Machines
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
@@ -41,8 +41,9 @@ function template_view_package()
 	{
 		echo '
 		<div class="errorbox">
-			', $txt['package_will_fail_title'], '<br />
-			', $txt['package_will_fail_warning'], '
+			', sprintf($txt['package_will_fail_title'], $txt['package_' . ($context['uninstalling'] ? 'uninstall' : 'install')]), '<br />
+			', sprintf($txt['package_will_fail_warning'], $txt['package_' . ($context['uninstalling'] ? 'uninstall' : 'install')]),
+			!empty($context['failure_details']) ? '<br /><br /><strong>' . $context['failure_details'] . '</strong>' : '', '
 		</div>';
 	}
 
@@ -54,7 +55,6 @@ function template_view_package()
 				<h3 class="catbg">', $txt['package_' . ($context['uninstalling'] ? 'un' : '') . 'install_readme'], '</h3>
 			</div>
 			<div class="windowbg2">
-				<span class="topslice"><span></span></span>
 				<div class="content">
 					', $context['package_readme'], '
 					<span class="floatright">', $txt['package_available_readme_language'], '
@@ -65,11 +65,10 @@ function template_view_package()
 						</select>
 					</span>
 				</div>
-				<span class="botslice"><span></span></span>
 			</div>
 			<br />';
 	}
-	
+
 	// Did they specify a license to display?
 	if (isset($context['package_license']))
 	{
@@ -78,7 +77,6 @@ function template_view_package()
 				<h3 class="catbg">', $txt['package_install_license'], '</h3>
 			</div>
 			<div class="windowbg2">
-				<span class="topslice"><span></span></span>
 				<div class="content">
 					', $context['package_license'], '
 					<span class="floatright">', $txt['package_available_license_language'], '
@@ -89,13 +87,12 @@ function template_view_package()
 						</select>
 					</span>
 				</div>
-				<span class="botslice"><span></span></span>
 			</div>
 			<br />';
 	}
-	
+
 	echo '
-		<form action="', $scripturl, '?action=admin;area=packages;sa=', $context['uninstalling'] ? 'uninstall' : 'install', $context['ftp_needed'] ? '' : '2', ';package=', $context['filename'], ';pid=', $context['install_id'], '" onsubmit="submitonce(this);" method="post" accept-charset="', $context['character_set'], '">
+		<form action="', $context['post_url'], '" onsubmit="submitonce(this);" method="post" accept-charset="', $context['character_set'], '">
 			<div class="cat_bar">
 				<h3 class="catbg">
 					', $context['uninstalling'] ? $txt['package_uninstall_actions'] : $txt['package_install_actions'], ' &quot;', $context['package_name'], '&quot;
@@ -107,7 +104,6 @@ function template_view_package()
 	{
 		echo '
 			<div class="windowbg2">
-				<span class="topslice"><span></span></span>
 				<div class="content">
 					<label for="do_db_changes"><input type="checkbox" name="do_db_changes" id="do_db_changes" class="input_check" />', $txt['package_db_uninstall'], '</label> [<a href="#" onclick="return swap_database_changes();">', $txt['package_db_uninstall_details'], '</a>]
 					<div id="db_changes_div">
@@ -121,7 +117,6 @@ function template_view_package()
 						</ul>
 					</div>
 				</div>
-				<span class="botslice"><span></span></span>
 			</div>';
 	}
 
@@ -147,7 +142,7 @@ function template_view_package()
 					<th scope="col" width="30"></th>
 					<th scope="col" class="lefttext">', $txt['package_install_type'], '</th>
 					<th scope="col" class="lefttext" width="50%">', $txt['package_install_action'], '</th>
-					<th class="last_th lefttext" scope="col" class="lefttext" width="20%">', $txt['package_install_desc'], '</th>
+					<th class="last_th lefttext" scope="col" width="20%">', $txt['package_install_desc'], '</th>
 				</tr>
 			</thead>
 			<tbody>';
@@ -341,8 +336,7 @@ function template_view_package()
 			<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />', (isset($context['form_sequence_number']) && !$context['ftp_needed']) ? '
 			<input type="hidden" name="seqnum" value="' . $context['form_sequence_number'] . '" />' : '', '
 		</form>
-	</div>
-	<br class="clear" />';
+	</div>';
 
 	// Toggle options.
 	echo '
@@ -376,7 +370,7 @@ function template_view_package()
 
 	echo '
 	// ]]></script>';
-	
+
 	// Get the currently selected item from a select list
 	echo '
 	<script type="text/javascript"><!-- // --><![CDATA[
@@ -438,7 +432,6 @@ function template_extract_package()
 
 	echo '
 		<div class="windowbg">
-			<span class="topslice"><span></span></span>
 			<div class="content">';
 
 	// If we are going to redirect we have a slightly different agenda.
@@ -469,7 +462,6 @@ function template_extract_package()
 
 	echo '
 			</div>
-			<span class="botslice"><span></span></span>
 		</div>';
 
 	// Show the "restore permissions" screen?
@@ -480,8 +472,7 @@ function template_extract_package()
 	}
 
 	echo '
-	</div>
-	<br class="clear" />';
+	</div>';
 }
 
 function template_list()
@@ -497,7 +488,6 @@ function template_list()
 			<h3 class="titlebg">', $txt['files_archive'], ' ', $context['filename'], ':</h3>
 		</div>
 		<div class="windowbg">
-			<span class="topslice"><span></span></span>
 			<div class="content">
 				<ol>';
 
@@ -510,10 +500,8 @@ function template_list()
 				<br />
 				<a href="', $scripturl, '?action=admin;area=packages">[ ', $txt['back'], ' ]</a>
 			</div>
-			<span class="botslice"><span></span></span>
 		</div>
-	</div>
-	<br class="clear" />';
+	</div>';
 }
 
 function template_examine()
@@ -529,15 +517,12 @@ function template_examine()
 			<h3 class="titlebg">', $txt['package_file_contents'], ' ', $context['filename'], ':</h3>
 		</div>
 		<div class="windowbg">
-			<span class="topslice"><span></span></span>
 			<div class="content">
 				<pre class="file_content">', $context['filedata'], '</pre>
 				<a href="', $scripturl, '?action=admin;area=packages;sa=list;package=', $context['package'], '">[ ', $txt['list_files'], ' ]</a>
 			</div>
-			<span class="botslice"><span></span></span>
 		</div>
-	</div>
-	<br class="clear" />';
+	</div>';
 }
 
 function template_browse()
@@ -550,44 +535,39 @@ function template_browse()
 	if ($context['sub_action'] == 'browse')
 	{
 		echo '
-		<div class="cat_bar">
-			<h3 class="catbg">
-				<span class="ie6_header floatleft"><a href="', $scripturl, '?action=helpadmin;help=latest_packages" onclick="return reqWin(this.href);" class="help"><img class="icon" src="', $settings['images_url'], '/helptopics.png" alt="', $txt['help'], '" /></a> ', $txt['packages_latest'], '</span>
-			</h3>
-		</div>
-		<div class="windowbg2">
-			<span class="topslice"><span></span></span>
-			<div class="content">
-				<div id="packagesLatest">', $txt['packages_latest_fetch'], '</div>
+		<div id="admin_form_wrapper">
+			<div class="cat_bar">
+				<h3 class="catbg">
+					<a href="', $scripturl, '?action=helpadmin;help=latest_packages" onclick="return reqOverlayDiv(this.href);" class="help"><img class="icon" src="', $settings['images_url'], '/helptopics_hd.png" alt="', $txt['help'], '" /></a> ', $txt['packages_latest'], '
+				</h3>
 			</div>
-			<span class="botslice clear_right"><span></span></span>
-		</div>
+			<div class="windowbg2">
+				<div class="content">
+					<div id="packagesLatest">', $txt['packages_latest_fetch'], '</div>
+				</div>
+			</div>
 
-		<script type="text/javascript"><!-- // --><![CDATA[
-			window.smfForum_scripturl = "', $scripturl, '";
-			window.smfForum_sessionid = "', $context['session_id'], '";
-			window.smfForum_sessionvar = "', $context['session_var'], '";';
+			<script type="text/javascript"><!-- // --><![CDATA[
+				window.smfForum_scripturl = smf_scripturl;
+				window.smfForum_sessionid = smf_session_id;
+				window.smfForum_sessionvar = smf_session_var;';
 
 		// Make a list of already installed mods so nothing is listed twice ;).
 		echo '
-			window.smfInstalledPackages = ["', implode('", "', $context['installed_mods']), '"];
-			window.smfVersion = "', $context['forum_version'], '";
-		// ]]></script>';
+				window.smfInstalledPackages = ["', implode('", "', $context['installed_mods']), '"];
+				window.smfVersion = "', $context['forum_version'], '";
+			// ]]></script>';
 
 		if (empty($modSettings['disable_smf_js']))
 			echo '
-		<script type="text/javascript" src="', $scripturl, '?action=viewsmfile;filename=latest-packages.js"></script>';
+			<script type="text/javascript" src="', $scripturl, '?action=viewsmfile;filename=latest-packages.js"></script>';
 
 		echo '
-		<script type="text/javascript"><!-- // --><![CDATA[
-			var tempOldOnload;
-			smfSetLatestPackages();
-		// ]]></script>';
+			<script type="text/javascript"><!-- // --><![CDATA[
+				var tempOldOnload;
+				smfSetLatestPackages();
+			// ]]></script>
 
-		echo '
-		<br class="clear" />
-		<div class="cat_bar">
-			<h3 class="catbg">', $txt['browse_packages'], '</h3>
 		</div>';
 	}
 
@@ -603,11 +583,10 @@ function template_browse()
 
 	if (!$mods_available)
 		echo '
-		<div class="information">', $context['sub_action'] == 'browse' ? $txt['no_packages'] : $txt['no_mods_installed'], '</div>';
+		<div class="descbox">', $context['sub_action'] == 'browse' ? $txt['no_packages'] : $txt['no_mods_installed'], '</div>';
 
 	// the advanced (emulation) box, collapsed by default
 	echo '
-		<br class="clear" />
 		<form action="', $scripturl, '?action=admin;area=packages;sa=', $context['sub_action'], '" method="get">
 			<div id="advanced_box" >
 				<div class="cat_bar">
@@ -617,7 +596,6 @@ function template_browse()
 					</h3>
 				</div>
 				<div id="advanced_panel_div" class="windowbg">
-					<span class="topslice"><span></span></span>
 					<div class="content">
 						<p>
 							', $txt['package_emulate_desc'], '
@@ -637,17 +615,15 @@ function template_browse()
 							<input type="submit" value="', $txt['package_apply'], '" class="button_submit" />
 						</div>
 					</div>
-					<span class="botslice"><span></span></span>
 				</div>
 			</div>
 			<input type="hidden" name="action" value="admin" />
 			<input type="hidden" name="area" value="packages" />
 			<input type="hidden" name="sa" value="', $context['sub_action'], '" />
 		</form>';
-	
+
 	echo '
 	</div>
-	<br class="clear" />
 	<script type="text/javascript"><!-- // --><![CDATA[
 		var oAdvancedPanelToggle = new smc_Toggle({
 			bToggleEnabled: true,
@@ -704,7 +680,7 @@ function template_servers()
 					</div>';
 
 	echo '
-	<div id="admincenter">
+	<div id="admin_form_wrapper">
 		<div class="cat_bar">
 			<h3 class="catbg">', $txt['download_new_package'], '</h3>
 		</div>';
@@ -716,7 +692,6 @@ function template_servers()
 			<h3 class="titlebg">', $txt['package_ftp_necessary'], '</h3>
 		</div>
 		<div class="windowbg">
-			<span class="topslice"><span></span></span>
 			<div class="content">
 				<p>
 					', $txt['package_ftp_why_download'], '
@@ -754,13 +729,11 @@ function template_servers()
 					</div>
 				</form>
 			</div>
-			<span class="botslice"><span></span></span>
 		</div>';
 	}
 
 	echo '
 		<div class="windowbg2">
-			<span class="topslice"><span></span></span>
 			<div class="content">
 				<fieldset>
 					<legend>' . $txt['package_servers'] . '</legend>
@@ -822,14 +795,12 @@ function template_servers()
 					</form>
 				</fieldset>
 			</div>
-			<span class="botslice"><span></span></span>
 		</div>
 		<br />
 		<div class="cat_bar">
 			<h3 class="catbg">' . $txt['package_upload_title'] . '</h3>
 		</div>
 		<div class="windowbg">
-			<span class="topslice"><span></span></span>
 			<div class="content">
 				<form action="' . $scripturl . '?action=admin;area=packages;get;sa=upload" method="post" accept-charset="', $context['character_set'], '" enctype="multipart/form-data" style="margin-bottom: 0;">
 					<dl class="settings">
@@ -843,13 +814,10 @@ function template_servers()
 					<hr class="hrcolor" />
 					<input type="submit" value="' . $txt['package_upload'] . '" class="button_submit" />
 					<input type="hidden" name="' . $context['session_var'] . '" value="' . $context['session_id'] . '" />
-					<br class="clear_right" />
 				</form>
 			</div>
-			<span class="botslice"><span></span></span>
 		</div>
-	</div>
-	<br class="clear" />';
+	</div>';
 }
 
 function template_package_confirm()
@@ -862,15 +830,12 @@ function template_package_confirm()
 			<h3 class="catbg">', $context['page_title'], '</h3>
 		</div>
 		<div class="windowbg">
-			<span class="topslice"><span></span></span>
 			<div class="content">
 				<p>', $context['confirm_message'], '</p>
 				<a href="', $context['proceed_href'], '">[ ', $txt['package_confirm_proceed'], ' ]</a> <a href="JavaScript:history.go(-1);">[ ', $txt['package_confirm_go_back'], ' ]</a>
 			</div>
-			<span class="botslice"><span></span></span>
 		</div>
-	</div>
-	<br class="clear" />';
+	</div>';
 }
 
 function template_package_list()
@@ -883,7 +848,6 @@ function template_package_list()
 			<h3 class="catbg">' . $context['page_title'] . '</h3>
 		</div>
 		<div class="windowbg">
-			<span class="topslice"><span></span></span>
 			<div class="content">';
 
 	// No packages, as yet.
@@ -901,7 +865,7 @@ function template_package_list()
 		{
 			echo '
 					<li>
-						<strong><img id="ps_img_', $i, '" src="', $settings['images_url'], '/upshrink.png" alt="*" style="display: none;" /> ', $packageSection['title'], '</strong>';
+						<strong><img id="ps_img_', $i, '" src="', $settings['images_url'], '/collapse.png" alt="*" style="display: none;" /> ', $packageSection['title'], '</strong>';
 
 			if (!empty($packageSection['text']))
 				echo '
@@ -941,7 +905,7 @@ function template_package_list()
 				{
 					// 1. Some mod [ Download ].
 					echo '
-							<strong><img id="ps_img_', $i, '_pkg_', $id, '" src="', $settings['images_url'], '/upshrink.png" alt="*" style="display: none;" /> ', $package['can_install'] ? '<strong>' . $package['name'] . '</strong> <a href="' . $package['download']['href'] . '">[ ' . $txt['download'] . ' ]</a>': $package['name'];
+							<strong><img id="ps_img_', $i, '_pkg_', $id, '" src="', $settings['images_url'], '/collapse.png" alt="*" style="display: none;" /> ', $package['can_install'] ? '<strong>' . $package['name'] . '</strong> <a href="' . $package['download']['href'] . '">[ ' . $txt['download'] . ' ]</a>': $package['name'];
 
 					// Mark as installed and current?
 					if ($package['is_installed'] && !$package['is_newer'])
@@ -990,7 +954,6 @@ function template_package_list()
 
 	echo '
 			</div>
-			<span class="botslice"><span></span></span>
 		</div>
 		<div class="padding smalltext floatleft">
 			', $txt['package_installed_key'], '
@@ -998,7 +961,6 @@ function template_package_list()
 			<img src="', $settings['images_url'], '/icons/package_old.png" alt="" class="centericon" style="margin-left: 2ex;" /> ', $txt['package_installed_old'], '
 		</div>
 	</div>
-	<br class="clear" />
 
 		';
 		// Now go through and turn off all the sections.
@@ -1019,9 +981,9 @@ function template_package_list()
 					aSwapImages: [
 						{
 							sId: \'ps_img_', $section, '\',
-							srcExpanded: smf_images_url + \'/upshrink.png\',
+							srcExpanded: smf_images_url + \'/collapse.png\',
 							altExpanded: \'*\',
-							srcCollapsed: smf_images_url + \'/upshrink2.png\',
+							srcCollapsed: smf_images_url + \'/expand.png\',
 							altCollapsed: \'*\'
 						}
 					]
@@ -1040,9 +1002,9 @@ function template_package_list()
 					aSwapImages: [
 						{
 							sId: \'ps_img_', $section, '_pkg_', $id, '\',
-							srcExpanded: smf_images_url + \'/upshrink.png\',
+							srcExpanded: smf_images_url + \'/collapse.png\',
 							altExpanded: \'*\',
-							srcCollapsed: smf_images_url + \'/upshrink2.png\',
+							srcCollapsed: smf_images_url + \'/expand.png\',
 							altCollapsed: \'*\'
 						}
 					]
@@ -1064,7 +1026,6 @@ function template_downloaded()
 			<h3 class="catbg">', $context['page_title'], '</h3>
 		</div>
 		<div class="windowbg">
-			<span class="topslice"><span></span></span>
 			<div class="content">
 				<p>', (empty($context['package_server']) ? $txt['package_uploaded_successfully'] : $txt['package_downloaded_successfully']), '</p>
 				<ul class="reset">
@@ -1076,10 +1037,8 @@ function template_downloaded()
 				<br /><br />
 				<p><a href="', $scripturl, '?action=admin;area=packages;get', (isset($context['package_server']) ? ';sa=browse;server=' . $context['package_server'] : ''), '">[ ', $txt['back'], ' ]</a></p>
 			</div>
-			<span class="botslice"><span></span></span>
 		</div>
-	</div>
-	<br class="clear" />';
+	</div>';
 }
 
 function template_install_options()
@@ -1096,7 +1055,6 @@ function template_install_options()
 		</div>
 
 		<div class="windowbg">
-			<span class="topslice"><span></span></span>
 			<div class="content">
 				<form action="', $scripturl, '?action=admin;area=packages;sa=options" method="post" accept-charset="', $context['character_set'], '">
 					<dl class="settings">
@@ -1131,16 +1089,13 @@ function template_install_options()
 							<input type="checkbox" name="package_make_full_backups" id="package_make_full_backups" value="1" class="input_check"', $context['package_make_full_backups'] ? ' checked="checked"' : '', ' />
 						</dd>
 					</dl>
-					<hr class="hrcolor" />
+
 					<input type="submit" name="save" value="', $txt['save'], '" class="button_submit" />
 					<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
-					<br class="clear_right" />
 				</form>
 			</div>
-			<span class="botslice"><span></span></span>
 		</div>
-	</div>
-	<br class="clear" />';
+	</div>';
 }
 
 function template_control_chmod()
@@ -1543,7 +1498,7 @@ function template_file_permissions()
 	// ]]></script>';
 
 		echo '
-	<div class="information">
+	<div class="noticebox">
 		<div>
 			<strong>', $txt['package_file_perms_warning'], ':</strong>
 			<div class="smalltext">
@@ -1571,12 +1526,12 @@ function template_file_permissions()
 					<th align="center" width="8%"><span class="filepermissions">', $txt['package_file_perms_status_custom'], '</span></th>
 					<th class="last_th" align="center" width="8%"><span class="filepermissions">', $txt['package_file_perms_status_no_change'], '</span></th>
 				</tr>
-			</thead>';
+			</thead>
+			<tbody>';
 
 	foreach ($context['file_tree'] as $name => $dir)
 	{
 		echo '
-			<tbody>
 				<tr class="windowbg2">
 					<td width="30%"><strong>';
 
@@ -1597,21 +1552,20 @@ function template_file_permissions()
 					<td align="center" class="perm_custom" width="8%"><input type="radio" name="permStatus[', $name, ']" value="custom" class="input_radio" /></td>
 					<td align="center" class="perm_nochange" width="8%"><input type="radio" name="permStatus[', $name, ']" value="no_change" checked="checked" class="input_radio" /></td>
 				</tr>
-			</tbody>';
+			';
 
 		if (!empty($dir['contents']))
 			template_permission_show_contents($name, $dir['contents'], 1);
 	}
 
 	echo '
-
+			</tbody>
 		</table>
 		<br />
 		<div class="cat_bar">
 			<h3 class="catbg">', $txt['package_file_perms_change'], '</h3>
 		</div>
 		<div class="windowbg">
-			<span class="topslice"><span></span></span>
 			<div class="content">
 				<fieldset>
 					<dl>
@@ -1620,7 +1574,7 @@ function template_file_permissions()
 							<label for="method_individual"><strong>', $txt['package_file_perms_apply'], '</strong></label>
 						</dt>
 						<dd>
-							<em class="smalltext">', $txt['package_file_perms_custom'], ': <input type="text" name="custom_value" value="0755" maxlength="4" size="5" class="input_text" />&nbsp;<a href="', $scripturl, '?action=helpadmin;help=chmod_flags" onclick="return reqWin(this.href);" class="help">(?)</a></em>
+							<em class="smalltext">', $txt['package_file_perms_custom'], ': <input type="text" name="custom_value" value="0755" maxlength="4" size="5" class="input_text" />&nbsp;<a href="', $scripturl, '?action=helpadmin;help=chmod_flags" onclick="return reqOverlayDiv(this.href);" class="help">(?)</a></em>
 						</dd>
 						<dt>
 							<input type="radio" name="method" value="predefined" id="method_predefined" class="input_radio" />
@@ -1644,16 +1598,13 @@ function template_file_permissions()
 					', $txt['package_file_perms_ftp_details'], ':
 				</p>
 				', template_control_chmod(), '
-				<div class="information">', $txt['package_file_perms_ftp_retain'], '</div>';
+				<div class="descbox">', $txt['package_file_perms_ftp_retain'], '</div>';
 
 	echo '
 				<span id="test_ftp_placeholder_full"></span>
-				<hr class="hrcolor" />
 				<input type="hidden" name="action_changes" value="1" />
 				<input type="submit" value="', $txt['package_file_perms_go'], '" name="go" class="button_submit" />
-				<br class="clear_right" />
 			</div>
-			<span class="botslice"><span></span></span>
 		</div>';
 
 	// Any looks fors we've already done?
@@ -1668,6 +1619,7 @@ function template_permission_show_contents($ident, $contents, $level, $has_more 
 {
 	global $settings, $txt, $scripturl, $context;
 	$js_ident = preg_replace('~[^A-Za-z0-9_\-=:]~', ':-:', $ident);
+
 	// Have we actually done something?
 	$drawn_div = false;
 
@@ -1679,8 +1631,10 @@ function template_permission_show_contents($ident, $contents, $level, $has_more 
 			{
 				$drawn_div = true;
 				echo '
+			</tbody>
 			</table>
-			<table border="0" width="100%" class="table_grid" id="', $js_ident, '">';
+			<table border="0" width="100%" class="table_grid" id="', $js_ident, '">
+			<tbody>';
 			}
 
 			$cur_ident = preg_replace('~[^A-Za-z0-9_\-=:]~', ':-:', $ident . '/' . $name);
@@ -1739,10 +1693,12 @@ function template_permission_show_contents($ident, $contents, $level, $has_more 
 
 		if ($level > 1 && !$isFound)
 			echo '
+		</tbody>
 		</table><script type="text/javascript"><!-- // --><![CDATA[
 			expandFolder(\'', $js_ident, '\', \'\');
 		// ]]></script>
 		<table border="0" width="100%" class="table_grid">
+			<tbody>
 			<tr style="display: none;"><td></td></tr>';
 	}
 }
@@ -1773,7 +1729,6 @@ function template_action_permissions()
 
 	echo '
 			<div class="windowbg">
-				<span class="topslice"><span></span></span>
 				<div class="content">
 					<div>
 						<strong>', $progress_message, '</strong><br /><br />
@@ -1834,11 +1789,9 @@ function template_action_permissions()
 						<input type="submit" name="go" id="cont" value="', $txt['not_done_continue'], '" class="button_submit" />
 					</div>
 				</div>
-				<span class="botslice"><span></span></span>
 			</div>
 		</form>
-	</div>
-	<br class="clear" />';
+	</div>';
 
 	// Just the countdown stuff
 	echo '

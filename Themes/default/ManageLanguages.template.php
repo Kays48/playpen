@@ -5,7 +5,7 @@
  *
  * @package SMF
  * @author Simple Machines
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
@@ -29,14 +29,11 @@ function template_download_language()
 			</h3>
 		</div>
 		<div class="windowbg">
-			<span class="topslice"><span></span></span>
 			<div class="content">
 				', $context['install_complete'], '
 			</div>
-			<span class="botslice"><span></span></span>
 		</div>
-	</div>
-	<br class="clear" />';
+	</div>';
 		return;
 	}
 
@@ -57,7 +54,6 @@ function template_download_language()
 				</h3>
 			</div>
 			<div class="windowbg">
-				<span class="topslice"><span></span></span>
 				<div class="content">
 					<p>
 						', $txt['languages_download_note'], '
@@ -66,7 +62,6 @@ function template_download_language()
 						', $txt['languages_download_info'], '
 					</div>
 				</div>
-				<span class="botslice"><span></span></span>
 			</div>';
 
 	// Show the main files.
@@ -92,7 +87,7 @@ function template_download_language()
 						<th scope="col" width="100">
 							', $txt['languages_download_exists'], '
 						</th>
-						<th class="last_th" scope="col" width="50">
+						<th class="last_th centercol" scope="col" width="4%">
 							', $txt['languages_download_copy'], '
 						</th>
 					</tr>
@@ -124,7 +119,7 @@ function template_download_language()
 					<td>
 						', $file['exists'] ? ($file['exists'] == 'same' ? $txt['languages_download_exists_same'] : $txt['languages_download_exists_different']) : $txt['no'], '
 					</td>
-					<td>
+					<td class="centercol">
 						<input type="checkbox" name="copy_file[]" value="', $file['generaldest'], '"', ($file['default_copy'] ? ' checked="checked"' : ''), ' class="input_check" />
 					</td>
 				</tr>';
@@ -153,7 +148,6 @@ function template_download_language()
 				</h3>
 			</div>
 			<div class="windowbg">
-				<span class="topslice"><span></span></span>
 				<div class="content">
 					<p>', $txt['package_ftp_why'],'</p>
 					<dl class="settings">
@@ -187,7 +181,6 @@ function template_download_language()
 						</dd>
 					</dl>
 				</div>
-				<span class="botslice"><span></span></span>
 			</div>';
 	}
 
@@ -199,8 +192,7 @@ function template_download_language()
 				<input type="submit" name="do_install" value="', $txt['add_language_smf_install'], '" class="button_submit" />
 			</div>
 		</form>
-	</div>
-	<br class="clear" />';
+	</div>';
 
 	// The javascript for expand and collapse of sections.
 	echo '
@@ -252,12 +244,12 @@ function template_modify_language_entries()
 					', $txt['edit_languages'], '
 				</h3>
 			</div>
-			<div class="information">
+			<div id="editlang_desc" class="information">
 				', $txt['edit_language_entries_primary'], '
 			</div>';
 
 	// Not writable?
-	if ($context['lang_file_not_writable_message'])
+	if (!empty($context['lang_file_not_writable_message']))
 	{
 		// Oops, show an error for ya.
 		echo '
@@ -269,42 +261,41 @@ function template_modify_language_entries()
 	// Show the language entries
 	echo '
 			<div class="windowbg">
-				<span class="topslice"><span></span></span>
 				<div class="content">
 					<fieldset>
 						<legend>', $context['primary_settings']['name'], '</legend>
-					<dl class="settings">
-						<dt>
-							<label for="character_set">', $txt['languages_character_set'], ':</label>
-						</dt>
-						<dd>
-							<input type="text" name="character_set" id="character_set" size="20" value="', $context['primary_settings']['character_set'], '"', (empty($context['file_entries']) ? '' : ' disabled="disabled"'), ' class="input_text" />
-						</dd>
-						<dt>
-							<label for="locale>', $txt['languages_locale'], ':</label>
-						</dt>
-						<dd>
-							<input type="text" name="locale" id="locale" size="20" value="', $context['primary_settings']['locale'], '"', (empty($context['file_entries']) ? '' : ' disabled="disabled"'), ' class="input_text" />
-						</dd>
-						<dt>
-							<label for="dictionary">', $txt['languages_dictionary'], ':</label>
-						</dt>
-						<dd>
-							<input type="text" name="dictionary" id="dictionary" size="20" value="', $context['primary_settings']['dictionary'], '"', (empty($context['file_entries']) ? '' : ' disabled="disabled"'), ' class="input_text" />
-						</dd>
-						<dt>
-							<label for="spelling">', $txt['languages_spelling'], ':</label>
-						</dt>
-						<dd>
-							<input type="text" name="spelling" id="spelling" size="20" value="', $context['primary_settings']['spelling'], '"', (empty($context['file_entries']) ? '' : ' disabled="disabled"'), ' class="input_text" />
-						</dd>
-						<dt>
-							<label for="rtl">', $txt['languages_rtl'], ':</label>
-						</dt>
-						<dd>
-							<input type="checkbox" name="rtl" id="rtl" ', $context['primary_settings']['rtl'] ? ' checked="checked"' : '', ' class="input_check"', (empty($context['file_entries']) ? '' : ' disabled="disabled"'), ' />
-						</dd>
-					</dl>
+						<dl class="settings">
+							<dt>
+								<label for="character_set">', $txt['languages_character_set'], ':</label>
+							</dt>
+							<dd>
+								<input type="text" name="character_set" id="character_set" size="20" value="', $context['primary_settings']['character_set'], '"', (empty($context['file_entries']) ? '' : ' disabled="disabled"'), ' class="input_text" />
+							</dd>
+							<dt>
+								<label for="locale>', $txt['languages_locale'], ':</label>
+							</dt>
+							<dd>
+								<input type="text" name="locale" id="locale" size="20" value="', $context['primary_settings']['locale'], '"', (empty($context['file_entries']) ? '' : ' disabled="disabled"'), ' class="input_text" />
+							</dd>
+							<dt>
+								<label for="dictionary">', $txt['languages_dictionary'], ':</label>
+							</dt>
+							<dd>
+								<input type="text" name="dictionary" id="dictionary" size="20" value="', $context['primary_settings']['dictionary'], '"', (empty($context['file_entries']) ? '' : ' disabled="disabled"'), ' class="input_text" />
+							</dd>
+							<dt>
+								<label for="spelling">', $txt['languages_spelling'], ':</label>
+							</dt>
+							<dd>
+								<input type="text" name="spelling" id="spelling" size="20" value="', $context['primary_settings']['spelling'], '"', (empty($context['file_entries']) ? '' : ' disabled="disabled"'), ' class="input_text" />
+							</dd>
+							<dt>
+								<label for="rtl">', $txt['languages_rtl'], ':</label>
+							</dt>
+							<dd>
+								<input type="checkbox" name="rtl" id="rtl" ', $context['primary_settings']['rtl'] ? ' checked="checked"' : '', ' class="input_check"', (empty($context['file_entries']) ? '' : ' disabled="disabled"'), ' />
+							</dd>
+						</dl>
 					</fieldset>
 					<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
 					<input type="hidden" name="', $context['admin-mlang_token_var'], '" value="', $context['admin-mlang_token'], '" />
@@ -319,9 +310,7 @@ function template_modify_language_entries()
 	}
 
 	echo '
-					<br class="clear_right" />
 				</div>
-				<span class="botslice"><span></span></span>
 			</div>
 		</form>
 
@@ -350,8 +339,9 @@ function template_modify_language_entries()
 					</select>
 					<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
 					<input type="hidden" name="', $context['admin-mlang_token_var'], '" value="', $context['admin-mlang_token'], '" />
-					<input type="submit" value="', $txt['go'], '" class="button_submit" />
-			</div>';
+					<input type="submit" value="', $txt['go'], '" class="button_submit" style="float: none"/>
+			</div>
+			<br class="clear" />';
 
 	// Is it not writable?
 	// Show an error.
@@ -366,7 +356,6 @@ function template_modify_language_entries()
 	{
 		echo '
 			<div class="windowbg2">
-				<span class="topslice"><span></span></span>
 				<div class="content">
 					<dl class="settings">';
 
@@ -423,8 +412,6 @@ function template_modify_language_entries()
 
 		echo '
 				</div>
-				<br class="clear" />
-				<span class="botslice"><span></span></span>
 			</div>';
 	}
 	echo '
@@ -442,14 +429,13 @@ function template_add_language()
 
 	echo '
 	<div id="admincenter">
-		<form action="', $scripturl, '?action=admin;area=languages;sa=add;', $context['session_var'], '=', $context['session_id'], '" method="post" accept-charset="', $context['character_set'], '">
+		<form id="admin_form_wrapper"action="', $scripturl, '?action=admin;area=languages;sa=add;', $context['session_var'], '=', $context['session_id'], '" method="post" accept-charset="', $context['character_set'], '">
 			<div class="cat_bar">
 				<h3 class="catbg">
 					', $txt['add_language'], '
 				</h3>
 			</div>
 			<div class="windowbg">
-				<span class="topslice"><span></span></span>
 				<div class="content">
 					<fieldset>
 						<legend>', $txt['add_language_smf'], '</legend>
@@ -469,7 +455,6 @@ function template_add_language()
 					<input type="submit" name="smf_add_sub" value="', $txt['search'], '" class="button_submit" />
 					<br />
 				</div>
-				<span class="botslice"><span></span></span>
 			</div>
 		';
 
@@ -484,8 +469,7 @@ function template_add_language()
 
 	echo '
 		</form>
-	</div>
-	<br class="clear" />';
+	</div>';
 }
 
 ?>

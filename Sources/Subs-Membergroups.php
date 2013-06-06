@@ -7,14 +7,14 @@
  *
  * @package SMF
  * @author Simple Machines http://www.simplemachines.org
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
  */
 
 if (!defined('SMF'))
-	die('Hacking attempt...');
+	die('No direct access...');
 
 /**
  * Delete one of more membergroups.
@@ -24,7 +24,7 @@ if (!defined('SMF'))
  * Deletes the permissions linked to the membergroup.
  * Takes members out of the deleted membergroups.
  * @param array $groups
- * @return bool
+ * @return boolean
  */
 function deleteMembergroups($groups)
 {
@@ -209,9 +209,10 @@ function deleteMembergroups($groups)
  * @param array $members
  * @param array $groups = null if groups is null, the specified members are stripped from all their membergroups.
  * @param bool $permissionCheckDone = false
- * @return bool
+ * @param bool $ignoreProtected = false
+ * @return boolean
  */
-function removeMembersFromGroups($members, $groups = null, $permissionCheckDone = false)
+function removeMembersFromGroups($members, $groups = null, $permissionCheckDone = false, $ignoreProtected = false)
 {
 	global $smcFunc, $user_info, $modSettings, $sourcedir;
 
@@ -312,7 +313,7 @@ function removeMembersFromGroups($members, $groups = null, $permissionCheckDone 
 	$groups = array_diff($groups, $implicitGroups);
 
 	// Don't forget the protected groups.
-	if (!allowedTo('admin_forum'))
+	if (!allowedTo('admin_forum') && !$ignoreProtected)
 	{
 		$request = $smcFunc['db_query']('', '
 			SELECT id_group
@@ -434,9 +435,10 @@ function removeMembersFromGroups($members, $groups = null, $permissionCheckDone 
  * 	- auto              - Assigns a membergroup to the primary group if it's still
  * 						  available. If not, assign it to the additional group.
  * @param bool $permissionCheckDone
- * @return bool success or failure
+ * @param bool $ignoreProtected
+ * @return boolean success or failure
  */
-function addMembersToGroup($members, $group, $type = 'auto', $permissionCheckDone = false)
+function addMembersToGroup($members, $group, $type = 'auto', $permissionCheckDone = false, $ignoreProtected = false)
 {
 	global $smcFunc, $user_info, $modSettings, $sourcedir;
 
@@ -487,7 +489,7 @@ function addMembersToGroup($members, $group, $type = 'auto', $permissionCheckDon
 	if (!allowedTo('admin_forum') && $group == 1)
 		return false;
 	// ... and assign protected groups!
-	elseif (!allowedTo('admin_forum'))
+	elseif (!allowedTo('admin_forum') && !$ignoreProtected)
 	{
 		$request = $smcFunc['db_query']('', '
 			SELECT group_type
@@ -560,26 +562,27 @@ function addMembersToGroup($members, $group, $type = 'auto', $permissionCheckDon
 	else
 		trigger_error('addMembersToGroup(): Unknown type \'' . $type . '\'', E_USER_WARNING);
 
+	call_integration_hook('integrate_add_members_to_group', array($members, $group, &$group_names));
+
 	// Update their postgroup statistics.
 	updateStats('postgroups', $members);
 
 	// Log the data.
-	$log_inserts = array();
 	require_once($sourcedir . '/Logging.php');
 	foreach ($members as $member)
 		logAction('added_to_group', array('group' => $group_names[$group], 'member' => $member), 'admin');
-
-	call_integration_hook('integrate_add_members_to_group', array($log_inserts));
 
 	return true;
 }
 
 /**
+ * Gets the members of a supplied membergroup
+ * Returns them as a link for display
  *
  * @param array &$members
  * @param int $membergroup
  * @param int $limit = null
- * @return bool
+ * @return boolean
  */
 function listMembergroupMembers_Href(&$members, $membergroup, $limit = null)
 {
@@ -609,7 +612,13 @@ function listMembergroupMembers_Href(&$members, $membergroup, $limit = null)
 		return false;
 }
 
-// Retrieve a list of (visible) membergroups used by the cache.
+/**
+ * Retrieve a list of (visible) membergroups used by the cache.
+ *
+ * @global type $scripturl
+ * @global type $smcFunc
+ * @return type
+ */
 function cache_getMembergroupList()
 {
 	global $scripturl, $smcFunc;
@@ -641,37 +650,70 @@ function cache_getMembergroupList()
 	);
 }
 
+/**
+ * Helper function to generate a list of membergroups for display
+ *
+ * @param type $start
+ * @param type $items_per_page
+ * @param type $sort
+ * @param type $membergroup_type
+ * @return type
+ */
 function list_getMembergroups($start, $items_per_page, $sort, $membergroup_type)
 {
-	global $txt, $scripturl, $context, $settings, $smcFunc;
+	global $txt, $scripturl, $context, $settings, $smcFunc, $user_info;
 
 	$groups = array();
 
-	// Get the basic group data.
 	$request = $smcFunc['db_query']('substring_membergroups', '
-		SELECT id_group, group_name, min_posts, online_color, icons, 0 AS num_members
-		FROM {db_prefix}membergroups
-		WHERE min_posts ' . ($membergroup_type === 'post_count' ? '!=' : '=') . ' -1' . (allowedTo('admin_forum') ? '' : '
-			AND group_type != {int:is_protected}') . '
+		SELECT mg.id_group, mg.group_name, mg.min_posts, mg.description, mg.group_type, mg.online_color, mg.hidden,
+			mg.icons, IFNULL(gm.id_member, 0) AS can_moderate, 0 AS num_members
+		FROM {db_prefix}membergroups AS mg
+			LEFT JOIN {db_prefix}group_moderators AS gm ON (gm.id_group = mg.id_group AND gm.id_member = {int:current_member})
+		WHERE mg.min_posts {raw:min_posts}' . (allowedTo('admin_forum') ? '' : '
+			AND mg.id_group != {int:mod_group}
+			AND mg.group_type != {int:is_protected}') . '
 		ORDER BY {raw:sort}',
 		array(
+			'current_member' => $user_info['id'],
+			'min_posts' => ($membergroup_type === 'post_count' ? '!= ' : '= ') . -1,
+			'mod_group' => 3,
 			'is_protected' => 1,
 			'sort' => $sort,
 		)
 	);
+
+	// Start collecting the data.
+	$groups = array();
+	$group_ids = array();
+	$context['can_moderate'] = allowedTo('manage_membergroups');
 	while ($row = $smcFunc['db_fetch_assoc']($request))
+	{
+		// We only list the groups they can see.
+		if ($row['hidden'] && !$row['can_moderate'] && !allowedTo('manage_membergroups'))
+			continue;
+
+		$row['icons'] = explode('#', $row['icons']);
+
 		$groups[$row['id_group']] = array(
 			'id_group' => $row['id_group'],
 			'group_name' => $row['group_name'],
 			'min_posts' => $row['min_posts'],
+			'desc' => $row['description'],
 			'online_color' => $row['online_color'],
-			'icons' => $row['icons'],
+			'type' => $row['group_type'],
 			'num_members' => $row['num_members'],
+			'moderators' => array(),
+			'icons' => !empty($row['icons'][0]) && !empty($row['icons'][1]) ? str_repeat('<img src="' . $settings['images_url'] . '/membericons/' . $row['icons'][1] . '" alt="*" />', $row['icons'][0]) : '',
 		);
+
+		$context['can_moderate'] |= $row['can_moderate'];
+		$group_ids[] = $row['id_group'];
+	}
 	$smcFunc['db_free_result']($request);
 
 	// If we found any membergroups, get the amount of members in them.
-	if (!empty($groups))
+	if (!empty($group_ids))
 	{
 		if ($membergroup_type === 'post_count')
 		{
@@ -681,7 +723,7 @@ function list_getMembergroups($start, $items_per_page, $sort, $membergroup_type)
 				WHERE id_post_group IN ({array_int:group_list})
 				GROUP BY id_post_group',
 				array(
-					'group_list' => array_keys($groups),
+					'group_list' => $group_ids,
 				)
 			);
 			while ($row = $smcFunc['db_fetch_assoc']($query))
@@ -697,30 +739,47 @@ function list_getMembergroups($start, $items_per_page, $sort, $membergroup_type)
 				WHERE id_group IN ({array_int:group_list})
 				GROUP BY id_group',
 				array(
-					'group_list' => array_keys($groups),
+					'group_list' => $group_ids,
 				)
 			);
 			while ($row = $smcFunc['db_fetch_assoc']($query))
 				$groups[$row['id_group']]['num_members'] += $row['num_members'];
 			$smcFunc['db_free_result']($query);
 
-			$query = $smcFunc['db_query']('', '
-				SELECT mg.id_group, COUNT(*) AS num_members
-				FROM {db_prefix}membergroups AS mg
-					INNER JOIN {db_prefix}members AS mem ON (mem.additional_groups != {string:blank_string}
-						AND mem.id_group != mg.id_group
-						AND FIND_IN_SET(mg.id_group, mem.additional_groups) != 0)
-				WHERE mg.id_group IN ({array_int:group_list})
-				GROUP BY mg.id_group',
-				array(
-					'group_list' => array_keys($groups),
-					'blank_string' => '',
-				)
-			);
-			while ($row = $smcFunc['db_fetch_assoc']($query))
-				$groups[$row['id_group']]['num_members'] += $row['num_members'];
-			$smcFunc['db_free_result']($query);
+			// Only do additional groups if we can moderate...
+			if ($context['can_moderate'])
+			{
+				$query = $smcFunc['db_query']('', '
+					SELECT mg.id_group, COUNT(*) AS num_members
+					FROM {db_prefix}membergroups AS mg
+						INNER JOIN {db_prefix}members AS mem ON (mem.additional_groups != {string:blank_string}
+							AND mem.id_group != mg.id_group
+							AND FIND_IN_SET(mg.id_group, mem.additional_groups) != 0)
+					WHERE mg.id_group IN ({array_int:group_list})
+					GROUP BY mg.id_group',
+					array(
+						'group_list' => $group_ids,
+						'blank_string' => '',
+					)
+				);
+				while ($row = $smcFunc['db_fetch_assoc']($query))
+					$groups[$row['id_group']]['num_members'] += $row['num_members'];
+				$smcFunc['db_free_result']($query);
+			}
 		}
+
+		$query = $smcFunc['db_query']('', '
+			SELECT mods.id_group, mods.id_member, mem.member_name, mem.real_name
+			FROM {db_prefix}group_moderators AS mods
+				INNER JOIN {db_prefix}members AS mem ON (mem.id_member = mods.id_member)
+			WHERE mods.id_group IN ({array_int:group_list})',
+			array(
+				'group_list' => $group_ids,
+			)
+		);
+		while ($row = $smcFunc['db_fetch_assoc']($query))
+			$groups[$row['id_group']]['moderators'][] = '<a href="' . $scripturl . '?action=profile;u=' . $row['id_member'] . '">' . $row['real_name'] . '</a>';
+		$smcFunc['db_free_result']($query);
 	}
 
 	// Apply manual sorting if the 'number of members' column is selected.

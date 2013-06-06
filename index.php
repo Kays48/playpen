@@ -14,7 +14,7 @@
  *
  * @package SMF
  * @author Simple Machines http://www.simplemachines.org
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
@@ -44,19 +44,10 @@ require_once(dirname(__FILE__) . '/Settings.php');
 if ((empty($cachedir) || !file_exists($cachedir)) && file_exists($boarddir . '/cache'))
 	$cachedir = $boarddir . '/cache';
 
-// And important includes.
+// Without those we can't go anywhere
 require_once($sourcedir . '/QueryString.php');
-require_once($sourcedir . '/Session.php');
 require_once($sourcedir . '/Subs.php');
-require_once($sourcedir . '/Errors.php');
-require_once($sourcedir . '/Logging.php');
 require_once($sourcedir . '/Load.php');
-require_once($sourcedir . '/Security.php');
-require_once($sourcedir . '/Class-BrowserDetect.php');
-
-// Using an pre-PHP 5.1 version?
-if (version_compare(PHP_VERSION, '5.1', '<'))
-	require_once($sourcedir . '/Subs-Compat.php');
 
 // If $maintenance is set specifically to 2, then we're upgrading or something.
 if (!empty($maintenance) && $maintenance == 2)
@@ -84,6 +75,23 @@ if (isset($_GET['scheduled']))
 	require_once($sourcedir . '/ScheduledTasks.php');
 	AutoTask();
 }
+// Displaying attached avatars
+elseif (isset($_GET['action']) && $_GET['action'] == 'dlattach' && isset($_GET['type']) && $_GET['type'] == 'avatar')
+{
+	require_once($sourcedir. '/Avatar.php');
+	showAvatar();
+}
+
+// And important includes.
+require_once($sourcedir . '/Session.php');
+require_once($sourcedir . '/Errors.php');
+require_once($sourcedir . '/Logging.php');
+require_once($sourcedir . '/Security.php');
+require_once($sourcedir . '/Class-BrowserDetect.php');
+
+// Using an pre-PHP 5.1 version?
+if (version_compare(PHP_VERSION, '5.1', '<'))
+	require_once($sourcedir . '/Subs-Compat.php');
 
 // Check if compressed output is enabled, supported, and not already being done.
 if (!empty($modSettings['enableCompressedOutput']) && !headers_sent())
@@ -170,6 +178,9 @@ function smf_main()
 		die("\x47\x49\x46\x38\x39\x61\x01\x00\x01\x00\x80\x00\x00\x00\x00\x00\x00\x00\x00\x21\xF9\x04\x01\x00\x00\x00\x00\x2C\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02\x44\x01\x00\x3B");
 	}
 
+	// We should set our security headers now.
+	frameOptionsHeader();
+
 	// Load the user's cookie (or set as guest) and load their settings.
 	loadUserSettings();
 
@@ -193,8 +204,8 @@ function smf_main()
 	if (!empty($topic) && empty($board_info['cur_topic_approved']) && !allowedTo('approve_posts') && ($user_info['id'] != $board_info['cur_topic_starter'] || $user_info['is_guest']))
 		fatal_lang_error('not_a_topic', false);
 
-	$no_stat_actions = array('dlattach', 'findmember', 'jseditor', 'jsoption', 'requestmembers', 'smstats', '.xml', 'xmlhttp', 'verificationcode', 'viewquery', 'viewsmfile');
-	call_integration_hook('integrate_pre_log_stats', $no_stat_actions);
+	$no_stat_actions = array('dlattach', 'findmember', 'jsoption', 'requestmembers', 'smstats', '.xml', 'xmlhttp', 'verificationcode', 'viewquery', 'viewsmfile');
+	call_integration_hook('integrate_pre_log_stats', array(&$no_stat_actions));
 	// Do some logging, unless this is an attachment, avatar, toggle of editor buttons, theme option, XML feed etc.
 	if (empty($_REQUEST['action']) || !in_array($_REQUEST['action'], $no_stat_actions))
 	{
@@ -231,14 +242,20 @@ function smf_main()
 	}
 	elseif (empty($_REQUEST['action']))
 	{
-		// Action and board are both empty... BoardIndex!
+		// Action and board are both empty... BoardIndex! Unless someone else wants to do something different.
 		if (empty($board) && empty($topic))
 		{
-			$call = 'BoardIndex';
-			call_integration_hook('integrate_default_action', $call);
-			require_once($sourcedir . '/' . $call . '.php');
+			$defaultActions = call_integration_hook('integrate_default_action');
+			foreach ($defaultActions as $defaultAction)
+			{
+				$call = strpos($defaultAction, '::') !== false ? explode('::', $defaultAction) : $defaultAction;
+				if (!empty($call) && is_callable($call))
+					return $call;
+			}
 
-			return $call;
+			require_once($sourcedir . '/BoardIndex.php');
+
+			return 'BoardIndex';
 		}
 		// Topic is empty, and action is empty.... MessageIndex!
 		elseif (empty($topic))
@@ -267,7 +284,7 @@ function smf_main()
 		'coppa' => array('Register.php', 'CoppaForm'),
 		'credits' => array('Who.php', 'Credits'),
 		'deletemsg' => array('RemoveTopic.php', 'DeleteMessage'),
-		'display' => array('Display.php', 'Display'),
+		'disregardtopic' => array('Notify.php', 'TopicDisregard'),
 		'dlattach' => array('Display.php', 'Download'),
 		'editpoll' => array('Poll.php', 'EditPoll'),
 		'editpoll2' => array('Poll.php', 'EditPoll2'),
@@ -276,10 +293,9 @@ function smf_main()
 		'groups' => array('Groups.php', 'Groups'),
 		'help' => array('Help.php', 'ShowHelp'),
 		'helpadmin' => array('Help.php', 'ShowAdminHelp'),
-		'im' => array('PersonalMessage.php', 'MessageMain'),
-		'jseditor' => array('Subs-Editor.php', 'EditorMain'),
 		'jsmodify' => array('Post.php', 'JavaScriptModify'),
 		'jsoption' => array('Themes.php', 'SetJavaScript'),
+		'loadeditorlocale' => array('Subs-Editor.php', 'loadLocale'),
 		'lock' => array('Topic.php', 'LockTopic'),
 		'lockvoting' => array('Poll.php', 'LockVoting'),
 		'login' => array('LogInOut.php', 'Login'),

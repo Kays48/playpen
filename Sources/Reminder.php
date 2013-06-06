@@ -6,14 +6,14 @@
  *
  * @package SMF
  * @author Simple Machines http://www.simplemachines.org
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
  */
 
 if (!defined('SMF'))
-	die('Hacking attempt...');
+	die('No direct access...');
 
 /**
  * This is the controlling delegator
@@ -70,7 +70,7 @@ function RemindPick()
 	// You must enter a username/email address.
 	if (empty($where))
 		fatal_lang_error('username_no_exist', false);
-		
+
 	// Make sure we are not being slammed
 	spamProtection('remind');
 
@@ -110,9 +110,9 @@ function RemindPick()
 	{
 		// Awaiting approval...
 		if (trim($row['validation_code']) == '')
-			fatal_error($txt['registration_not_approved'] . ' <a href="' . $scripturl . '?action=activate;user=' . $_POST['user'] . '">' . $txt['here'] . '</a>.', false);
+			fatal_error(sprintf($txt['registration_not_approved'], $scripturl . '?action=activate;user=' . $_POST['user']), false);
 		else
-			fatal_error($txt['registration_not_activated'] . ' <a href="' . $scripturl . '?action=activate;user=' . $_POST['user'] . '">' . $txt['here'] . '</a>.', false);
+			fatal_error(sprintf($txt['registration_not_activated'], $scripturl . '?action=activate;user=' . $_POST['user']), false);
 	}
 
 	// You can't get emailed if you have no email address.
@@ -241,7 +241,7 @@ function setPassword2()
 	require_once($sourcedir . '/LogInOut.php');
 
 	// Quit if this code is not right.
-	if (empty($_POST['code']) || substr($realCode, 0, 10) != substr(md5($_POST['code']), 0, 10))
+	if (empty($_POST['code']) || substr($realCode, 0, 10) !== substr(md5($_POST['code']), 0, 10))
 	{
 		// Stop brute force attacks like this.
 		validatePasswordFlood($_POST['u'], $flood_value, false);

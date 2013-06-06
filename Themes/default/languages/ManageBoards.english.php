@@ -1,11 +1,11 @@
 <?php
-// Version: 2.0; ManageBoards
+// Version: 2.1; ManageBoards
 
 $txt['boards_and_cats'] = 'Manage Boards and Categories';
 $txt['order'] = 'Order';
 $txt['full_name'] = 'Full name';
 $txt['name_on_display'] = 'This is the name that will be displayed.';
-$txt['boards_and_cats_desc'] = 'Edit your categories and boards here. List multiple moderators as <em>&quot;username&quot;, &quot;username&quot;</em>. (these must be usernames not display names!)<br />To create a new board, click the Add Board button. To make the new board a child of a current board, select "Child of..." from the Order drop down menu when creating the board.';
+$txt['boards_and_cats_desc'] = 'Edit your categories and boards here. List multiple moderators as <em>&quot;username&quot;, &quot;username&quot;</em>. (these must be usernames and *not* display names)<br />To create a new board, click the Add Board button. To make the new board a child of a current board, select "Child of..." from the Order drop down menu when creating the board.';
 $txt['parent_members_only'] = 'Regular Members';
 $txt['parent_guests_only'] = 'Guests';
 $txt['catConfirm'] = 'Do you really want to delete this category?';
@@ -53,6 +53,8 @@ $txt['mboards_groups_regular_members'] = 'This group contains all members that h
 $txt['mboards_groups_post_group'] = 'This group is a post count based group.';
 $txt['mboards_moderators'] = 'Moderators';
 $txt['mboards_moderators_desc'] = 'Additional members to have moderation privileges on this board.  Note that administrators don\'t have to be listed here.';
+$txt['mboards_moderator_groups'] = 'Moderator Groups';
+$txt['mboards_moderator_groups_desc'] = 'Groups whose members have moderation priveleges on this board. Note that this is limited to groups which are not post-based, not "hidden" and not "protected".';
 $txt['mboards_count_posts'] = 'Count Posts';
 $txt['mboards_count_posts_desc'] = 'Makes new replies and topics raise members\' post counts.';
 $txt['mboards_unchanged'] = 'Unchanged';
@@ -89,7 +91,7 @@ $txt['recycle_board_unselected_notice'] = 'You have enabled the recycling of top
 $txt['countChildPosts'] = 'Count child\'s posts in parent\'s totals';
 $txt['allow_ignore_boards'] = 'Allow boards to be ignored';
 $txt['deny_boards_access'] = 'Enable the option to deny board access based on membergroup';
-$txt['boardsaccess_option_desc'] = 'For each permission you can choose \'Allow\' (A), \'Ignore\' (X), or <span class="alert">\'Deny\' (D)</span>.<br /><br />If you deny access, any member - (including moderators) - in that group will be denied access.<br />For this reason, you should set deny carefully, only when <strong>necessary</strong>. Ignore, on the other hand, denies unless otherwise granted.';
+$txt['boardsaccess_option_desc'] = 'For each permission you can choose \'Allow\' (A), \'Disallow\' (X), or <span class="alert">\'Deny\' (D)</span>.<br /><br />If you deny access, any member - (including moderators) - in that group will be denied access.<br />For this reason, you should set deny carefully, only when <strong>necessary</strong>. Disallow, on the other hand, denies unless otherwise granted.';
 
 $txt['mboards_select_destination'] = 'Select destination for board \'<strong>%1$s</strong>\'';
 $txt['mboards_cancel_moving'] = 'Cancel moving';

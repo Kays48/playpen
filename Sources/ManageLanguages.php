@@ -8,14 +8,14 @@
  * @package SMF
  * @author Simple Machines
  *
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
  */
 
 if (!defined('SMF'))
-	die('Hacking attempt...');
+	die('No direct access...');
 
 /**
  * This is the main function for the languages area.
@@ -43,8 +43,7 @@ function ManageLanguages()
 		'editlang' => 'ModifyLanguage',
 	);
 
-	$config_vars = array();
-	call_integration_hook('integrate_manage_languages', array(&$config_vars));
+	call_integration_hook('integrate_manage_languages', array(&$subActions));
 
 	// By default we're managing languages.
 	$_REQUEST['sa'] = isset($_REQUEST['sa']) && isset($subActions[$_REQUEST['sa']]) ? $_REQUEST['sa'] : 'edit';
@@ -56,7 +55,7 @@ function ManageLanguages()
 		'description' => $txt['language_description'],
 	);
 
-	// Call the right function for this sub-acton.
+	// Call the right function for this sub-action.
 	$subActions[$_REQUEST['sa']]();
 }
 
@@ -113,15 +112,16 @@ function AddLanguage()
 					),
 					'data' => array(
 						'db' => 'utf8',
-						'style' => 'text-align: center',
 					),
 				),
 				'install_link' => array(
 					'header' => array(
 						'value' => $txt['add_language_smf_install'],
+						'class' => 'centercol',
 					),
 					'data' => array(
 						'db' => 'install_link',
+						'class' => 'centercol',
 					),
 				),
 			),
@@ -136,6 +136,12 @@ function AddLanguage()
 	$context['sub_template'] = 'add_language';
 }
 
+/**
+ * Gets a list of available languages from the mother ship
+ * Will return a subset if searching, otherwise all avaialble
+ *
+ * @return string
+ */
 function list_getLanguagesList()
 {
 	global $forum_version, $context, $sourcedir, $smcFunc, $txt, $scripturl;
@@ -147,9 +153,11 @@ function list_getLanguagesList()
 	require_once($sourcedir . '/Class-Package.php');
 	$language_list = new xmlArray(fetch_web_data($url), true);
 
-	// Check it exists.
-	if (!$language_list->exists('languages/language'))
+	// Check that the site responded and that the language exists.
+	if (!$language_list->exists('languages'))
 		$context['smf_error'] = 'no_response';
+	elseif (!$language_list->exists('languages/language'))
+		$context['smf_error'] = 'no_files';
 	else
 	{
 		$language_list = $language_list->path('languages[0]');
@@ -211,6 +219,7 @@ function DownloadLanguage()
 
 		$chmod_files = array();
 		$install_files = array();
+
 		// Check writable status.
 		foreach ($_POST['copy_file'] as $file)
 		{
@@ -495,7 +504,6 @@ function DownloadLanguage()
 
 						return \'<span style="color: \' . ($rowData[\'writable\'] ? \'green\' : \'red\') . \';">\' . ($rowData[\'writable\'] ? $txt[\'yes\'] : $txt[\'no\']) . \'</span>\';
 					'),
-					'style' => 'text-align: center',
 				),
 			),
 			'version' => array(
@@ -525,12 +533,14 @@ function DownloadLanguage()
 			'copy' => array(
 				'header' => array(
 					'value' => $txt['languages_download_copy'],
+					'class' => 'centercol',
 				),
 				'data' => array(
 					'function' => create_function('$rowData', '
 						return \'<input type="checkbox" name="copy_file[]" value="\' . $rowData[\'generaldest\'] . \'" \' . ($rowData[\'default_copy\'] ? \'checked="checked"\' : \'\') . \' class="input_check" />\';
 					'),
-					'style' => 'text-align: center; width: 4%;',
+					'style' => 'width: 4%;',
+					'class' => 'centercol',
 				),
 			),
 		),
@@ -564,7 +574,18 @@ function ModifyLanguages()
 		checkSession();
 		validateToken('admin-lang');
 
-		if ($_POST['def_language'] != $language)
+		getLanguages(true, false);
+		$lang_exists = false;
+		foreach ($context['languages'] as $lang)
+		{
+			if ($_POST['def_language'] == $lang['filename'])
+			{
+				$lang_exists = true;
+				break;
+			}
+		}
+
+		if ($_POST['def_language'] != $language && $lang_exists)
 		{
 			require_once($sourcedir . '/Subs-Admin.php');
 			updateSettingsFile(array('language' => '\'' . $_POST['def_language'] . '\''));
@@ -590,12 +611,14 @@ function ModifyLanguages()
 			'default' => array(
 				'header' => array(
 					'value' => $txt['languages_default'],
+					'class' => 'centercol',
 				),
 				'data' => array(
 					'function' => create_function('$rowData', '
 						return \'<input type="radio" name="def_language" value="\' . $rowData[\'id\'] . \'" \' . ($rowData[\'default\'] ? \'checked="checked"\' : \'\') . \' onclick="highlightSelected(\\\'list_language_list_\' . $rowData[\'id\'] . \'\\\');" class="input_radio" />\';
 					'),
-					'style' => 'text-align: center; width: 8%;',
+					'style' => 'width: 8%;',
+					'class' => 'centercol',
 				),
 			),
 			'name' => array(
@@ -624,7 +647,6 @@ function ModifyLanguages()
 				),
 				'data' => array(
 					'db_htmlsafe' => 'count',
-					'style' => 'text-align: center',
 				),
 			),
 			'locale' => array(
@@ -642,9 +664,8 @@ function ModifyLanguages()
 		),
 		'additional_rows' => array(
 			array(
-				'position' => 'below_table_data',
+				'position' => 'bottom_of_list',
 				'value' => '<input type="hidden" name="' . $context['session_var'] . '" value="' . $context['session_id'] . '" /><input type="submit" name="set_default" value="' . $txt['save'] . '"' . (is_writable($boarddir . '/Settings.php') ? '' : ' disabled="disabled"') . ' class="button_submit" />',
-				'style' => 'text-align: right;',
 			),
 		),
 		// For highlighting the default.
@@ -801,7 +822,7 @@ function ModifyLanguageSettings($return_config = false)
 	{
 		checkSession();
 
-		call_integration_hook('integrate_save_language_settings');
+		call_integration_hook('integrate_save_language_settings', array(&$config_vars));
 
 		saveSettings($config_vars);
 		redirectexit('action=admin;area=languages;sa=settings');
@@ -1050,7 +1071,7 @@ function ModifyLanguage()
 			// Got a new entry?
 			if ($line[0] == '$' && !empty($multiline_cache))
 			{
-				preg_match('~\$(helptxt|txt)\[\'(.+)\'\]\s?=\s?(.+);~', strtr($multiline_cache, array("\n" => '', "\t" => '')), $matches);
+				preg_match('~\$(helptxt|txt|editortxt)\[\'(.+)\'\]\s?=\s?(.+);~ms', strtr($multiline_cache, array("\r" => '')), $matches);
 				if (!empty($matches[3]))
 				{
 					$entries[$matches[2]] = array(
@@ -1061,12 +1082,12 @@ function ModifyLanguage()
 					$multiline_cache = '';
 				}
 			}
-			$multiline_cache .= $line . "\n";
+			$multiline_cache .= $line;
 		}
 		// Last entry to add?
 		if ($multiline_cache)
 		{
-			preg_match('~\$(helptxt|txt)\[\'(.+)\'\]\s?=\s?(.+);~', strtr($multiline_cache, array("\n" => '', "\t" => '')), $matches);
+			preg_match('~\$(helptxt|txt|editortxt)\[\'(.+)\'\]\s?=\s?(.+);~ms', strtr($multiline_cache, array("\r" => '')), $matches);
 			if (!empty($matches[3]))
 				$entries[$matches[2]] = array(
 					'type' => $matches[1],
@@ -1087,7 +1108,7 @@ function ModifyLanguage()
 				continue;
 
 			// These are arrays that need breaking out.
-			$arrays = array('days', 'days_short', 'months', 'months_titles', 'months_short');
+			$arrays = array('days', 'days_short', 'months', 'months_titles', 'months_short', 'happy_birthday_author', 'karlbenson1_author', 'nite0859_author', 'zwaldowski_author', 'geezmo_author', 'karlbenson2_author');
 			if (in_array($entryKey, $arrays))
 			{
 				// Get off the first bits.
@@ -1193,7 +1214,7 @@ function ModifyLanguage()
 
 			// Save the actual changes.
 			$fp = fopen($current_file, 'w+');
-			fwrite($fp, $file_contents);
+			fwrite($fp, strtr($file_contents, array("\r" => '')));
 			fclose($fp);
 
 			$madeSave = true;
@@ -1316,7 +1337,7 @@ function cleanLangString($string, $to_display = true)
 		}
 
 		// Unhtml then rehtml the whole thing!
-		$new_string = htmlspecialchars(un_htmlspecialchars($new_string));
+		$new_string = $smcFunc['htmlspecialchars'](un_htmlspecialchars($new_string));
 	}
 	else
 	{
@@ -1326,26 +1347,8 @@ function cleanLangString($string, $to_display = true)
 		$in_html = false;
 		for ($i = 0; $i < strlen($string); $i++)
 		{
-			// Handle line breaks!
-			if ($string{$i} == "\n" || $string{$i} == "\t")
-			{
-				// Are we in a string? Is it the right type?
-				if ($in_string == 1)
-				{
-					// Change type!
-					$new_string .= '\' . "\\' . ($string{$i} == "\n" ? 'n' : 't');
-					$in_string = 2;
-				}
-				elseif ($in_string == 2)
-					$new_string .= '\\' . ($string{$i} == "\n" ? 'n' : 't');
-				// Otherwise start one off - joining if required.
-				else
-					$new_string .= ($new_string ? ' . ' : '') . '"\\' . ($string{$i} == "\n" ? 'n' : 't');
-
-				continue;
-			}
 			// We don't do parsed strings apart from for breaks.
-			elseif ($in_string == 2)
+			if ($in_string == 2)
 			{
 				$in_string = 0;
 				$new_string .= '"';

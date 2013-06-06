@@ -6,23 +6,23 @@
  * core report generation is done in two areas. Firstly, a report "generator"
  * will fill context with relevant data. Secondly, the choice of sub-template
  * will determine how this data is shown to the user
- * 
+ *
  * Functions ending with "Report" are responsible for generating data for reporting.
  * They are all called from ReportsMain.
  * Never access the context directly, but use the data handling functions to do so.
- * 
+ *
  * Simple Machines Forum (SMF)
  *
  * @package SMF
  * @author Simple Machines http://www.simplemachines.org
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
  */
 
 if (!defined('SMF'))
-	die('Hacking attempt...');
+	die('No direct access...');
 
 /**
  * Handling function for generating reports.
@@ -61,6 +61,12 @@ function ReportsMain()
 	);
 
 	call_integration_hook('integrate_report_types');
+	// Load up all the tabs...
+	$context[$context['admin_menu_name']]['tab_data'] = array(
+		'title' => $txt['generate_reports'],
+		'help' => '',
+		'description' => $txt['generate_reports_desc'],
+	);
 
 	$is_first = 0;
 	foreach ($context['report_types'] as $k => $temp)
@@ -103,16 +109,16 @@ function ReportsMain()
 
 	// Make the page title more descriptive.
 	$context['page_title'] .= ' - ' . (isset($txt['gr_type_' . $context['report_type']]) ? $txt['gr_type_' . $context['report_type']] : $context['report_type']);
-	
+
 	// Build the reports button array.
 	$context['report_buttons'] = array(
 		'generate_reports' => array('text' => 'generate_reports', 'image' => 'print.png', 'lang' => true, 'url' => $scripturl . '?action=admin;area=reports', 'active' => true),
 		'print' => array('text' => 'print', 'image' => 'print.png', 'lang' => true, 'url' => $scripturl . '?action=admin;area=reports;rt=' . $context['report_type']. ';st=print', 'custom' => 'target="_blank"'),
 	);
-	
+
 	// Allow mods to add additional buttons here
-	call_integration_hook('integrate_report_buttons');	
-	
+	call_integration_hook('integrate_report_buttons');
+
 	// Now generate the data.
 	$context['report_types'][$context['report_type']]['function']();
 
@@ -150,6 +156,19 @@ function BoardReport()
 		$moderators[$row['id_board']][] = $row['real_name'];
 	$smcFunc['db_free_result']($request);
 
+	// Get every moderator gruop.
+	$request = $smcFunc['db_query']('', '
+		SELECT modgs.id_board, modgs.id_group, memg.group_name
+		FROM {db_prefix}moderator_groups AS modgs
+			INNER JOIN {db_prefix}membergroups AS memg ON (memg.id_group = modgs.id_group)',
+		array(
+		)
+	);
+	$moderator_groups = array();
+	while ($row = $smcFunc['db_fetch_assoc']($request))
+		$moderator_groups[$row['id_board']][] = $row['group_name'];
+	$smcFunc['db_free_result']($request);
+
 	// Get all the possible membergroups!
 	$request = $smcFunc['db_query']('', '
 		SELECT id_group, group_name, online_color
@@ -173,6 +192,7 @@ function BoardReport()
 		'override_theme' => $txt['board_override_theme'],
 		'profile' => $txt['board_profile'],
 		'moderators' => $txt['board_moderators'],
+		'moderator_groups' => $txt['board_moderator_groups'],
 		'groups' => $txt['board_groups'],
 	);
 	if (!empty($modSettings['deny_boards_access']))
@@ -217,6 +237,7 @@ function BoardReport()
 			'profile' => $profile_name,
 			'override_theme' => $row['override_theme'] ? $txt['yes'] : $txt['no'],
 			'moderators' => empty($moderators[$row['id_board']]) ? $txt['none'] : implode(', ', $moderators[$row['id_board']]),
+			'moderator_groups' => empty($moderator_groups[$row['id_board']]) ? $txt['none'] : implode(', ', $moderator_groups[$row['id_board']]),
 		);
 
 		// Work out the membergroups who can and cannot access it (but only if enabled).
@@ -303,8 +324,24 @@ function BoardPermissionsReport()
 		$boards[$row['id_board']] = array(
 			'name' => $row['name'],
 			'profile' => $row['id_profile'],
+			'mod_groups' => array(),
 		);
 		$profiles[] = $row['id_profile'];
+	}
+	$smcFunc['db_free_result']($request);
+	
+	// Get the ids of any groups allowed to moderate this board
+	// Limit it to any boards and/or groups we're looking at
+	$request = $smcFunc['db_query']('', '
+		SELECT id_board, id_group
+		FROM {db_prefix}moderator_groups
+		WHERE ' . $board_clause .' AND ' . $group_clause,
+		array(
+		)
+	);
+	while ($row = $smcFunc['db_fetch_assoc']($request))
+	{
+		$boards[$row['id_board']]['mod_groups'][] = $row['id_group'];
 	}
 	$smcFunc['db_free_result']($request);
 
@@ -402,6 +439,11 @@ function BoardPermissionsReport()
 				{
 					// Set the data for this group to be the local permission.
 					$curData[$id_group] = $group_permissions[$ID_PERM];
+				}
+				// Is it inherited from Moderator?
+				elseif (in_array($id_group, $boards[$board]['mod_groups']) && !empty($groups[3]) && isset($groups[3][$ID_PERM]))
+				{
+					$curData[$id_group] = $groups[3][$ID_PERM];
 				}
 				// Otherwise means it's set to disallow..
 				else
@@ -696,6 +738,27 @@ function StaffReport()
 	}
 	$smcFunc['db_free_result']($request);
 
+	// Get any additional boards they can moderate through group-based board moderation
+	$request = $smcFunc['db_query']('', '
+		SELECT mem.id_member, modgs.id_board
+		FROM {db_prefix}members AS mem
+			INNER JOIN {db_prefix}moderator_groups AS modgs ON (modgs.id_group = mem.id_group OR FIND_IN_SET(modgs.id_group, mem.additional_groups) != 0)',
+		array(
+		)
+	);
+	
+	// Add each board/member to the arrays, but only if they aren't already there
+	while ($row = $smcFunc['db_fetch_assoc']($request))
+	{
+		// Either we don't have them as a moderator at all or at least not as a moderator of this board
+		if (!array_key_exists($row['id_member'], $moderators) || !in_array($row['id_board'], $moderators[$row['id_member']]))
+			$moderators[$row['id_member']][] = $row['id_board'];
+		
+		// We don't have them listed as a moderator yet
+		if (!array_key_exists($row['id_member'], $local_mods))
+			$local_mods[$row['id_member']] = $row['id_member'];
+	}
+
 	// Get a list of global moderators (i.e. members with moderation powers).
 	$global_mods = array_intersect(membersAllowedTo('moderate_board', 0), membersAllowedTo('approve_posts', 0), membersAllowedTo('remove_any', 0), membersAllowedTo('modify_any', 0));
 
@@ -785,7 +848,7 @@ function StaffReport()
  * context, ready for filling using addData().
  * Fills the context variable current_table with the ID of the table created.
  * Keeps track of the current table count using context variable table_count.
- * 
+ *
  * @param string $title = '' Title to be displayed with this data table.
  * @param string $default_value = '' Value to be displayed if a key is missing from a row.
  * @param string $shading = 'all' Should the left, top or both (all) parts of the table beshaded?
@@ -839,7 +902,7 @@ function newTable($title = '', $default_value = '', $shading = 'all', $width_nor
  * if any key in the incoming data begins with '#sep#', the function
  * will add a separator accross the table at this point.
  * once the incoming data has been sanitized, it is added to the table.
- * 
+ *
  * @param array $inc_data
  * @param int $custom_table = null
  */
@@ -902,11 +965,11 @@ function addData($inc_data, $custom_table = null)
 
 /**
  * Add a separator row, only really used when adding data by rows.
- * 
+ *
  * @param string $title = ''
  * @param string $custom_table = null
- * 
- * @return bool returns false if there are no tables
+ *
+ * @return boolean returns false if there are no tables
  */
 function addSeparator($title = '', $custom_table = null)
 {
@@ -966,7 +1029,7 @@ function finishTables()
 
 /**
  * Set the keys in use by the tables - these ensure entries MUST exist if the data isn't sent.
- * 
+ *
  * sets the current set of "keys" expected in each data array passed to
  * addData. It also sets the way we are adding data to the data table.
  * method specifies whether the data passed to addData represents a new
@@ -975,7 +1038,7 @@ function finishTables()
  * addData().
  * if reverse is set to true, then the values of the variable "keys"
  * are used as oppossed to the keys(!
- * 
+ *
  * @param string $method = 'rows' rows or cols
  * @param array $keys = array()
  * @param bool $reverse = false

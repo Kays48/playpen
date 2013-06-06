@@ -1,5 +1,5 @@
 <?php
-// Version: 2.0; ManageScheduledTasks
+// Version: 2.1; ManageScheduledTasks
 
 $txt['scheduled_tasks_title'] = 'Scheduled Tasks';
 $txt['scheduled_tasks_header'] = 'All Scheduled Tasks';
@@ -33,6 +33,8 @@ $txt['scheduled_task_paid_subscriptions'] = 'Paid Subscription Checks';
 $txt['scheduled_task_desc_paid_subscriptions'] = 'Sends out any necessary paid subscription reminders and removes expired member subscriptions.';
 $txt['scheduled_task_remove_topic_redirect'] = 'Remove MOVED: redirection topics';
 $txt['scheduled_task_desc_remove_topic_redirect'] = 'Deletes "MOVED:" topic notifications as specified when the moved notice was created.';
+$txt['scheduled_task_remove_temp_attachments'] = 'Remove temporary attachment files';
+$txt['scheduled_task_desc_remove_temp_attachments'] = 'Deletes temporary files created while attaching a file to a post that for any reason weren\'t renamed or deleted before.';
 
 $txt['scheduled_task_reg_starting'] = 'Starting at %1$s';
 $txt['scheduled_task_reg_repeating'] = 'repeating every %1$d %2$s';
@@ -56,5 +58,8 @@ $txt['scheduled_log_time_taken'] = 'Time taken';
 $txt['scheduled_log_time_taken_seconds'] = '%1$d seconds';
 $txt['scheduled_log_empty_log'] = 'Clear Log';
 $txt['scheduled_log_empty_log_confirm'] = 'Are you sure you want to completely clear the log?';
+
+$txt['scheduled_task_remove_old_drafts'] = 'Remove old drafts';
+$txt['scheduled_task_desc_remove_old_drafts'] = 'Deletes drafts older than the number of days defined in the draft settings in the admin panel.';
 
 ?>

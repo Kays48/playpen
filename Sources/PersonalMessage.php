@@ -9,14 +9,14 @@
  *
  * @package SMF
  * @author Simple Machines http://www.simplemachines.org
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
  */
 
 if (!defined('SMF'))
-	die('Hacking attempt...');
+	die('No direct access...');
 
 /**
  * This helps organize things...
@@ -35,7 +35,7 @@ function MessageMain()
 	// This file contains the basic functions for sending a PM.
 	require_once($sourcedir . '/Subs-Post.php');
 
-	loadLanguage('PersonalMessage');
+	loadLanguage('PersonalMessage+Drafts');
 
 	if (WIRELESS && WIRELESS_PROTOCOL == 'wap')
 		fatal_lang_error('wireless_error_notyet', false);
@@ -174,6 +174,10 @@ function MessageMain()
 	$context['current_label_redirect'] = 'action=pm;f=' . $context['folder'] . (isset($_GET['start']) ? ';start=' . $_GET['start'] : '') . (isset($_REQUEST['l']) ? ';l=' . $_REQUEST['l'] : '');
 	$context['can_issue_warning'] = in_array('w', $context['admin_features']) && allowedTo('issue_warning') && $modSettings['warning_settings'][0] == 1;
 
+	// Are PM drafts enabled?
+	$context['drafts_pm_save'] = !empty($modSettings['drafts_enabled']) && !empty($modSettings['drafts_pm_enabled']) && allowedTo('pm_draft');
+	$context['drafts_autosave'] = !empty($context['drafts_pm_save']) && !empty($modSettings['drafts_autosave_enabled']) && allowedTo('pm_autosave_draft');
+
 	// Build the linktree for all the actions...
 	$context['linktree'][] = array(
 		'url' => $scripturl . '?action=pm',
@@ -197,6 +201,7 @@ function MessageMain()
 		'send' => 'MessagePost',
 		'send2' => 'MessagePost2',
 		'settings' => 'MessageSettings',
+		'showpmdrafts' => 'MessageDrafts',
 	);
 
 	if (!isset($_REQUEST['sa']) || !isset($subActions[$_REQUEST['sa']]))
@@ -210,7 +215,7 @@ function MessageMain()
 }
 
 /**
- * A sidebar to easily access different areas of the section
+ * A menu to easily access different areas of the PM section
  *
  * @param string $area
  */
@@ -234,6 +239,12 @@ function messageIndexBar($area)
 				'sent' => array(
 					'label' => $txt['sent_items'],
 					'custom_url' => $scripturl . '?action=pm;f=sent',
+				),
+				'drafts' => array(
+					'label' => $txt['drafts_show'],
+					'custom_url' => $scripturl . '?action=pm;sa=showpmdrafts',
+					'permission' => allowedTo('pm_draft'),
+					'enabled' => !empty($modSettings['drafts_enabled']) && !empty($modSettings['drafts_pm_enabled']),
 				),
 			),
 		),
@@ -332,22 +343,25 @@ function messageIndexBar($area)
 	$menuOptions = array(
 		'current_area' => $area,
 		'disable_url_session_check' => true,
-		'toggle_url' => $current_page . ';togglebar',
-		'toggle_redirect_url' => $current_page,
 	);
 
 	// Actually create the menu!
 	$pm_include_data = createMenu($pm_areas, $menuOptions);
 	unset($pm_areas);
 
+	// No menu means no access.
+	if (!$pm_include_data && (!$user_info['is_guest'] || validateSession()))
+		fatal_lang_error('no_access', false);
+
 	// Make a note of the Unique ID for this menu.
 	$context['pm_menu_id'] = $context['max_menu_id'];
 	$context['pm_menu_name'] = 'menu_data_' . $context['pm_menu_id'];
 
 	// Set the selected item.
-	$context['menu_item_selected'] = $pm_include_data['current_area'];
+	$current_area = $pm_include_data['current_area'];
+	$context['menu_item_selected'] = $current_area;
 
-	// obExit will know what to do!
+	// Set the template for this area and add the profile layer.
 	if (!WIRELESS && !isset($_REQUEST['xml']))
 		$context['template_layers'][] = 'pm';
 }
@@ -379,6 +393,7 @@ function MessageFolder()
 	$context['from_or_to'] = $context['folder'] != 'sent' ? 'from' : 'to';
 	$context['get_pmessage'] = 'prepareMessageContext';
 	$context['signature_enabled'] = substr($modSettings['signature_settings'], 0, 1) == 1;
+	$context['disabled_fields'] = isset($modSettings['disabled_profile_fields']) ? array_flip(explode(',', $modSettings['disabled_profile_fields'])) : array();
 
 	$labelQuery = $context['folder'] != 'sent' ? '
 			AND FIND_IN_SET(' . $context['current_label_id'] . ', pmr.labels) != 0' : '';
@@ -822,6 +837,17 @@ function MessageFolder()
 				'id_member' => $context['folder'] == 'sent' ? 'pmr.id_member' : 'pm.id_member_from',
 			)
 		);
+
+		// Build the conversation button array.
+		if ($context['display_mode'] == 2)
+		{
+			$context['conversation_buttons'] = array(
+				'delete' => array('text' => 'delete_conversation', 'image' => 'delete.png', 'lang' => true, 'url' => $scripturl . '?action=pm;sa=pmactions;pm_actions[' . $context['current_pm'] . ']=delete;conversation;f=' . $context['folder'] . ';start=' . $context['start'] . ($context['current_label_id'] != -1 ? ';l=' . $context['current_label_id'] : '') . ';' . $context['session_var'] . '=' . $context['session_id'], 'custom' => 'onclick="return confirm(\'' . addslashes($txt['remove_message']) . '?\');"'),
+			);
+
+			// Allow mods to add additional buttons here
+			call_integration_hook('integrate_conversation_buttons');
+		}
 	}
 	else
 		$messages_request = false;
@@ -841,18 +867,6 @@ function MessageFolder()
 		// Otherwise do just the current one!
 		elseif (!empty($context['current_pm']))
 			markMessages($display_pms, $context['current_label_id']);
-	}
-	
-	// Build the conversation button array.
-	if ($context['display_mode'] == 2)
-	{
-		$context['conversation_buttons'] = array(
-			'reply' => array('text' => 'reply_to_all', 'image' => 'reply.png', 'lang' => true, 'url' => $scripturl . '?action=pm;sa=send;f=' . $context['folder'] . ($context['current_label_id'] != -1 ? ';l=' . $context['current_label_id'] : '') . ';pmsg=' . $context['current_pm'] . ';u=all', 'active' => true),
-			'delete' => array('text' => 'delete_conversation', 'image' => 'delete.png', 'lang' => true, 'url' => $scripturl . '?action=pm;sa=pmactions;pm_actions[' . $context['current_pm'] . ']=delete;conversation;f=' . $context['folder'] . ';start=' . $context['start'] . ($context['current_label_id'] != -1 ? ';l=' . $context['current_label_id'] : '') . ';' . $context['session_var'] . '=' . $context['session_id'], 'custom' => 'onclick="return confirm(\'' . addslashes($txt['remove_message']) . '?\');"'),
-		);
-		
-		// Allow mods to add additional buttons here
-		call_integration_hook('integrate_conversation_buttons');
 	}
 }
 
@@ -940,6 +954,7 @@ function prepareMessageContext($type = 'subject', $reset = false)
 	{
 		$memberContext[$message['id_member_from']]['name'] = $message['from_name'];
 		$memberContext[$message['id_member_from']]['id'] = 0;
+
 		// Sometimes the forum sends messages itself (Warnings are an example) - in this case don't label it from a guest.
 		$memberContext[$message['id_member_from']]['group'] = $message['from_name'] == $context['forum_name'] ? '' : $txt['guest_title'];
 		$memberContext[$message['id_member_from']]['link'] = $message['from_name'];
@@ -953,7 +968,7 @@ function prepareMessageContext($type = 'subject', $reset = false)
 		$memberContext[$message['id_member_from']]['can_see_warning'] = !isset($context['disabled_fields']['warning_status']) && $memberContext[$message['id_member_from']]['warning_status'] && ($context['user']['can_mod'] || (!empty($modSettings['warning_show']) && ($modSettings['warning_show'] > 1 || $message['id_member_from'] == $user_info['id'])));
 	}
 
-		$memberContext[$message['id_member_from']]['show_profile_buttons'] = $settings['show_profile_buttons'] && (!empty($memberContext[$message['id_member_from']]['can_view_profile']) || (!empty($memberContext[$message['id_member_from']]['website']['url']) && !isset($context['disabled_fields']['website'])) || (in_array($memberContext[$message['id_member_from']]['show_email'], array('yes', 'yes_permission_override', 'no_through_forum'))) || $context['can_send_pm']);
+	$memberContext[$message['id_member_from']]['show_profile_buttons'] = $settings['show_profile_buttons'] && (!empty($memberContext[$message['id_member_from']]['can_view_profile']) || (!empty($memberContext[$message['id_member_from']]['website']['url']) && !isset($context['disabled_fields']['website'])) || (in_array($memberContext[$message['id_member_from']]['show_email'], array('yes', 'yes_permission_override', 'no_through_forum'))) || $context['can_send_pm']);
 
 	// Censor all the important text...
 	censorText($message['body']);
@@ -979,6 +994,9 @@ function prepareMessageContext($type = 'subject', $reset = false)
 		'is_replied_to' => &$context['message_replied'][$message['id_pm']],
 		'is_unread' => &$context['message_unread'][$message['id_pm']],
 		'is_selected' => !empty($temp_pm_selected) && in_array($message['id_pm'], $temp_pm_selected),
+		'is_message_author' => $message['id_member_from'] == $user_info['id'],
+		'can_report' => !empty($modSettings['enableReportPM']),
+		'can_see_ip' => allowedTo('moderate_forum') || ($message['id_member_from'] == $user_info['id'] && !empty($user_info['id'])),
 	);
 
 	$counter++;
@@ -1770,6 +1788,14 @@ function MessagePost()
 
 	$modSettings['disable_wysiwyg'] = !empty($modSettings['disable_wysiwyg']) || empty($modSettings['enableBBC']);
 
+	// Generate a list of drafts that they can load in to the editor
+	if (!empty($context['drafts_pm_save']))
+	{
+		require_once($sourcedir . '/Drafts.php');
+		$pm_seed = isset($_REQUEST['pmsg']) ? $_REQUEST['pmsg'] : (isset($_REQUEST['quote']) ? $_REQUEST['quote'] : 0);
+		ShowDrafts($user_info['id'], $pm_seed, 1);
+	}
+
 	// Needed for the WYSIWYG editor.
 	require_once($sourcedir . '/Subs-Editor.php');
 
@@ -1777,7 +1803,7 @@ function MessagePost()
 	$editorOptions = array(
 		'id' => 'message',
 		'value' => $context['message'],
-		'height' => '175px',
+		'height' => '250px',
 		'width' => '100%',
 		'labels' => array(
 			'post_button' => $txt['send_message'],
@@ -1803,6 +1829,24 @@ function MessagePost()
 
 	// Register this form and get a sequence number in $context.
 	checkSubmitOnce('register');
+}
+
+/**
+ * This function allows the user to view their PM drafts
+ */
+function MessageDrafts()
+{
+	global $sourcedir, $user_info;
+
+	// validate with loadMemberData()
+	$memberResult = loadMemberData($user_info['id'], false);
+	if (!is_array($memberResult))
+		fatal_lang_error('not_a_user', false);
+	list ($memID) = $memberResult;
+
+	// drafts is where the functions reside
+	require_once($sourcedir . '/Drafts.php');
+	showPMDrafts($memID);
 }
 
 /**
@@ -1921,9 +1965,9 @@ function messagePostError($error_types, $named_recipients, $recipient_ids = arra
 
 	// Set each of the errors for the template.
 	loadLanguage('Errors');
-	
+
 	$context['error_type'] = 'minor';
-	
+
 	$context['post_error'] = array(
 		'messages' => array(),
 		// @todo error handling: maybe fatal errors can be error_type => serious
@@ -1939,7 +1983,7 @@ function messagePostError($error_types, $named_recipients, $recipient_ids = arra
 				$txt['error_' . $error_type] = sprintf($txt['error_' . $error_type], $modSettings['max_messageLength']);
 			$context['post_error']['messages'][] = $txt['error_' . $error_type];
 		}
-		
+
 		// If it's not a minor error flag it as such.
 		if (!in_array($error_type, array('new_reply', 'not_approved', 'new_replies', 'old_topic', 'need_qr_verification', 'no_subject')))
 			$context['error_type'] = 'serious';
@@ -1953,6 +1997,7 @@ function messagePostError($error_types, $named_recipients, $recipient_ids = arra
 		'id' => 'message',
 		'value' => $context['message'],
 		'width' => '90%',
+		'height' => '250px',
 		'labels' => array(
 			'post_button' => $txt['send_message'],
 		),
@@ -1996,6 +2041,10 @@ function MessagePost2()
 	isAllowedTo('pm_send');
 	require_once($sourcedir . '/Subs-Auth.php');
 
+	// PM Drafts enabled and needed?
+	if ($context['drafts_pm_save'] && (isset($_POST['save_draft']) || isset($_POST['id_pm_draft'])))
+		require_once($sourcedir . '/Drafts.php');
+
 	loadLanguage('PersonalMessage', '', false);
 
 	// Extract out the spam settings - it saves database space!
@@ -2029,19 +2078,6 @@ function MessagePost2()
 			else
 				$post_errors[] = 'pm_too_many_per_hour';
 		}
-	}
-
-	// If we came from WYSIWYG then turn it back into BBC regardless.
-	if (!empty($_POST['message_mode']) && isset($_POST['message']))
-	{
-		require_once($sourcedir . '/Subs-Editor.php');
-		$_POST['message'] = html_to_bbc($_POST['message']);
-
-		// We need to unhtml it now as it gets done shortly.
-		$_POST['message'] = un_htmlspecialchars($_POST['message']);
-
-		// We need this in case of errors etc.
-		$_REQUEST['message'] = $_POST['message'];
 	}
 
 	// If your session timed out, show an error, but do allow to re-submit.
@@ -2174,9 +2210,7 @@ function MessagePost2()
 		$context['require_verification'] = create_control_verification($verificationOptions, true);
 
 		if (is_array($context['require_verification']))
-		{
 			$post_errors = array_merge($post_errors, $context['require_verification']);
-		}
 	}
 
 	// If they did, give a chance to make ammends.
@@ -2217,6 +2251,13 @@ function MessagePost2()
 		}
 
 		return messagePostError(array(), $namedRecipientList, $recipientList);
+	}
+
+	// Want to save this as a draft and think about it some more?
+	if ($context['drafts_pm_save'] && isset($_POST['save_draft']))
+	{
+		SavePMDraft($post_errors, $recipientList);
+		return messagePostError($post_errors, $namedRecipientList, $recipientList);
 	}
 
 	// Before we send the PM, let's make sure we don't have an abuse of numbers.
@@ -2268,7 +2309,13 @@ function MessagePost2()
 
 	// Message sent successfully?
 	if (!empty($context['send_log']) && empty($context['send_log']['failed']))
+	{
 		$context['current_label_redirect'] = $context['current_label_redirect'] . ';done=sent';
+
+		// If we had a PM draft for this one, then its time to remove it since it was just sent
+		if ($context['drafts_pm_save'] && !empty($_POST['id_pm_draft']))
+			DeleteDraft($_POST['id_pm_draft']);
+	}
 
 	// Go back to the where they sent from, if possible...
 	redirectexit($context['current_label_redirect']);
@@ -2582,7 +2629,7 @@ function MessagePrune()
 /**
  * Delete the specified personal messages.
  *
- * @param array $personal_messages, array of pm ids
+ * @param array $personal_messages array of pm ids
  * @param string $folder = null
  * @param int $owner = null
  */
@@ -3614,7 +3661,7 @@ function LoadRules($reload = false)
  *
  * @param int $pmID
  * @param $validFor
- * @return bool
+ * @return boolean
  */
 function isAccessiblePM($pmID, $validFor = 'in_or_outbox')
 {

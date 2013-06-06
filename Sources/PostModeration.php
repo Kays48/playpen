@@ -7,14 +7,14 @@
  *
  * @package SMF
  * @author Simple Machines http://www.simplemachines.org
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
  */
 
 if (!defined('SMF'))
-	die('Hacking attempt...');
+	die('No direct access...');
 
 /**
  * This is a handling function for all things post moderation.
@@ -72,7 +72,7 @@ function UnapprovedPosts()
 		$approve_query = ' AND m.id_board IN (' . implode(',', $approve_boards) . ')';
 	// Nada, zip, etc...
 	else
-		$approve_query = ' AND 0';
+		$approve_query = ' AND 1=0';
 
 	// We also need to know where we can delete topics and/or replies to.
 	if ($context['current_view'] == 'topics')
@@ -274,6 +274,7 @@ function UnapprovedPosts()
 			'alternate' => $i % 2,
 			'counter' => $context['start'] + $i,
 			'href' => $scripturl . '?topic=' . $row['id_topic'] . '.msg' . $row['id_msg'] . '#msg' . $row['id_msg'],
+			'link' => '<a href="' . $scripturl . '?topic=' . $row['id_topic'] . '.msg' . $row['id_msg'] . '#msg' . $row['id_msg'] . '">' . $row['subject'] . '</a>',
 			'subject' => $row['subject'],
 			'body' => parse_bbc($row['body'], $row['smileys_enabled'], $row['id_msg']),
 			'time' => timeformat($row['poster_time']),
@@ -289,10 +290,12 @@ function UnapprovedPosts()
 			'board' => array(
 				'id' => $row['id_board'],
 				'name' => $row['board_name'],
+				'link' => '<a href="' . $scripturl . '?board=' . $row['id_board'] . '.0">' . $row['board_name'] . '</a>',
 			),
 			'category' => array(
 				'id' => $row['id_cat'],
 				'name' => $row['cat_name'],
+				'link' => '<a href="' . $scripturl . '#c' . $row['id_cat'] . '">' . $row['cat_name'] . '</a>',
 			),
 			'can_delete' => $can_delete,
 		);
@@ -319,7 +322,7 @@ function UnapprovedAttachments()
 	elseif (!empty($approve_boards))
 		$approve_query = ' AND m.id_board IN (' . implode(',', $approve_boards) . ')';
 	else
-		$approve_query = ' AND 0';
+		$approve_query = ' AND 1=0';
 
 	// Get together the array of things to act on, if any.
 	$attachments = array();
@@ -472,6 +475,7 @@ function UnapprovedAttachments()
 				'header' => array(
 					'value' => '<input type="checkbox" class="input_check" onclick="invertAll(this, this.form);" checked="checked" />',
 					'style' => 'width: 4%;',
+					'class' => 'centercol',
 				),
 				'data' => array(
 					'sprintf' => array(
@@ -480,7 +484,7 @@ function UnapprovedAttachments()
 							'id' => false,
 						),
 					),
-					'style' => 'text-align: center;',
+					'class' => 'centercol',
 				),
 			),
 		),
@@ -513,13 +517,20 @@ function UnapprovedAttachments()
 	createToken('mod-ap');
 	createList($listOptions);
 
-	$context['sub_template'] = 'unapproved_attachments';
+	$context['sub_template'] = 'show_list';
+	$context['default_list'] = 'mc_unapproved_attach';
+
+	$context[$context['moderation_menu_name']]['tab_data'] = array(
+		'title' => $txt['mc_unapproved_attachments'],
+		'help' => '',
+		'description' => $txt['mc_unapproved_attachments_desc']
+	);
 }
 
 /**
  * Callback function for UnapprovedAttachments
  * retrieve all the attachments waiting for approval the approver can approve
- * 
+ *
  * @param int $start
  * @param int $items_per_page
  * @param string $sort
@@ -598,13 +609,10 @@ function list_getUnapprovedAttachments($start, $items_per_page, $sort, $approve_
 
 /**
  * Callback function for UnapprovedAttachments
- * count all the attachments waiting for approval the approver can approve
- * 
- * @param int $start
- * @param int $items_per_page
- * @param string $sort
+ * count all the attachments waiting for approval that this approver can approve
+ *
  * @param string $approve_query additional restrictions based on the boards the approver can see
- * @return int, the number of unapproved attachments
+ * @return int the number of unapproved attachments
  */
 function list_getNumUnapprovedAttachments($approve_query)
 {
@@ -667,14 +675,14 @@ function ApproveMessage()
 		approveTopics($topic, !$approved);
 
 		if ($starter != $user_info['id'])
-			logAction('approve_topic', array('topic' => $topic, 'subject' => $subject, 'member' => $starter, 'board' => $board));
+			logAction(($approved ? 'un' : '') . 'approve_topic', array('topic' => $topic, 'subject' => $subject, 'member' => $starter, 'board' => $board));
 	}
 	else
 	{
 		approvePosts($_REQUEST['msg'], !$approved);
 
 		if ($poster != $user_info['id'])
-			logAction('approve', array('topic' => $topic, 'subject' => $subject, 'member' => $poster, 'board' => $board));
+			logAction(($approved ? 'un' : '') . 'approve', array('topic' => $topic, 'subject' => $subject, 'member' => $poster, 'board' => $board));
 	}
 
 	redirectexit('topic=' . $topic . '.msg' . $_REQUEST['msg']. '#msg' . $_REQUEST['msg']);

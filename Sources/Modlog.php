@@ -8,14 +8,14 @@
  *
  * @package SMF
  * @author Simple Machines http://www.simplemachines.org
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
  */
 
 if (!defined('SMF'))
-	die('Hacking attempt...');
+	die('No direct access...');
 
 /**
  * Prepares the information from the moderation log for viewing.
@@ -156,7 +156,6 @@ function ViewModlog()
 	// This is all the information required for a watched user listing.
 	$listOptions = array(
 		'id' => 'moderation_log_list',
-		'title' => '<a href="' . $scripturl . '?action=helpadmin;help=' . ($context['log_type'] == 3 ? 'adminlog' : 'modlog') . '" onclick="return reqWin(this.href);" class="help"><img src="' . $settings['images_url'] . '/helptopics.png" alt="' . $txt['help'] . '" /></a> ' . $txt['modlog_' . ($context['log_type'] == 3 ? 'admin' : 'moderation') . '_log'],
 		'width' => '100%',
 		'items_per_page' => $context['displaypage'],
 		'no_items_label' => $txt['modlog_' . ($context['log_type'] == 3 ? 'admin_log_' : '') . 'no_entries_found'],
@@ -253,12 +252,13 @@ function ViewModlog()
 			'delete' => array(
 				'header' => array(
 					'value' => '<input type="checkbox" name="all" class="input_check" onclick="invertAll(this, this.form);" />',
+					'class' => 'centercol',
 				),
 				'data' => array(
 					'function' => create_function('$entry', '
 						return \'<input type="checkbox" class="input_check" name="delete[]" value="\' . $entry[\'id\'] . \'"\' . ($entry[\'editable\'] ? \'\' : \' disabled="disabled"\') . \' />\';
 					'),
-					'style' => 'text-align: center;',
+					'class' => 'centercol',
 				),
 			),
 		),
@@ -274,20 +274,15 @@ function ViewModlog()
 		),
 		'additional_rows' => array(
 			array(
-				'position' => 'after_title',
-				'value' => $txt['modlog_' . ($context['log_type'] == 3 ? 'admin' : 'moderation') . '_log_desc'],
-
-				'style' => 'padding: 1ex 2ex;',
-			),
-			array(
 				'position' => 'below_table_data',
 				'value' => '
 					' . $txt['modlog_search'] . ' (' . $txt['modlog_by'] . ': ' . $context['search']['label'] . '):
-					<input type="text" name="search" size="18" value="' . $context['search']['string'] . '" class="input_text" />
+					<input type="text" name="search" size="18" value="' . $smcFunc['htmlspecialchars']($context['search']['string']) . '" class="input_text" />
 					<input type="submit" name="is_search" value="' . $txt['modlog_go'] . '" class="button_submit" style="float:none" />
-					' . ($context['can_delete'] ? ' |
-						<input type="submit" name="remove" value="' . $txt['modlog_remove'] . '" onclick="return confirm(\'' . $txt['modlog_remove_selected_confirm'] . '\');" class="button_submit" />
-						<input type="submit" name="removeall" value="' . $txt['modlog_removeall'] . '" onclick="return confirm(\'' . $txt['modlog_remove_all_confirm'] . '\');" class="button_submit" />' : ''),
+					' . ($context['can_delete'] ? '&nbsp;|
+					<input type="submit" name="remove" value="' . $txt['modlog_remove'] . '" onclick="return confirm(\'' . $txt['modlog_remove_selected_confirm'] . '\');" class="button_submit" />
+					<input type="submit" name="removeall" value="' . $txt['modlog_removeall'] . '" onclick="return confirm(\'' . $txt['modlog_remove_all_confirm'] . '\');" class="button_submit" />' : ''),
+				'class' => 'floatright',
 			),
 		),
 	);
@@ -299,6 +294,12 @@ function ViewModlog()
 
 	$context['sub_template'] = 'show_list';
 	$context['default_list'] = 'moderation_log_list';
+
+	$context[$context['moderation_menu_name']]['tab_data'] = array(
+		'title' => $txt['modlog_' . ($context['log_type'] == 3 ? 'admin' : 'moderation') . '_log'],
+		'help' => $context['log_type'] == 3 ? 'adminlog' : 'modlog',
+		'description' => $txt['modlog_' . ($context['log_type'] == 3 ? 'admin' : 'moderation') . '_log_desc']
+	);
 }
 
 /**

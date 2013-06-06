@@ -7,14 +7,14 @@
  *
  * @package SMF
  * @author Simple Machines http://www.simplemachines.org
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
  */
 
 if (!defined('SMF'))
-	die('Hacking attempt...');
+	die('No direct access...');
 
 /**
  * Outputs xml data representing recent information or a profile.
@@ -170,7 +170,7 @@ function ShowXmlFeed()
 	// Show in rss or proprietary format?
 	$xml_format = isset($_GET['type']) && in_array($_GET['type'], array('smf', 'rss', 'rss2', 'atom', 'rdf', 'webslice')) ? $_GET['type'] : 'smf';
 
-	// @todo Birthdays? 
+	// @todo Birthdays?
 
 	// List all the different types of data they can pull.
 	$subActions = array(
@@ -179,10 +179,10 @@ function ShowXmlFeed()
 		'members' => array('getXmlMembers', 'member'),
 		'profile' => array('getXmlProfile', null),
 	);
-	
+
 	// Easy adding of sub actions
  	call_integration_hook('integrate_xmlfeeds', array(&$subActions));
-	
+
 	if (empty($_GET['sa']) || !isset($subActions[$_GET['sa']]))
 		$_GET['sa'] = 'recent';
 
@@ -260,6 +260,7 @@ function ShowXmlFeed()
 	elseif ($xml_format == 'webslice')
 	{
 		$context['recent_posts_data'] = $xml;
+		$context['can_pm_read'] = allowedTo('pm_read');
 
 		// This always has RSS 2
 		echo '
@@ -348,6 +349,13 @@ function ShowXmlFeed()
 	obExit(false);
 }
 
+/**
+ * Called from dumpTags to convert data to xml
+ * Finds urls for local sitte and santizes them
+ *
+ * @param type $val
+ * @return type
+ */
 function fix_possible_url($val)
 {
 	global $modSettings, $context, $scripturl;
@@ -364,6 +372,14 @@ function fix_possible_url($val)
 	return $val;
 }
 
+/**
+ * Ensures supplied data is properly encpsulated in cdata xml tags
+ * Called from getXmlProfile in News.php
+ *
+ * @param type $data
+ * @param type $ns
+ * @return type
+ */
 function cdata_parse($data, $ns = '')
 {
 	global $smcFunc, $cdata_override;
@@ -438,9 +454,9 @@ function cdata_parse($data, $ns = '')
  * Additionally formats data based on the specific format passed.
  * This function is recursively called to handle sub arrays of data.
 
- * @param array $data, the array to output as xml data
- * @param int $i, the amount of indentation to use.
- * @param string $tag, if specified, it will be used instead of the keys of data.
+ * @param array $data the array to output as xml data
+ * @param int $i the amount of indentation to use.
+ * @param string $tag if specified, it will be used instead of the keys of data.
  * @param string $xml_format
  */
 function dumpTags($data, $i, $tag = null, $xml_format = '')
@@ -954,10 +970,10 @@ function getXmlProfile($xml_format)
 			$data['icq'] = $profile['icq']['name'];
 		if ($profile['aim']['name'] != '' && !(!empty($modSettings['guest_hideContacts']) && $user_info['is_guest']))
 			$data['aim'] = $profile['aim']['name'];
-		if ($profile['msn']['name'] != '' && !(!empty($modSettings['guest_hideContacts']) && $user_info['is_guest']))
-			$data['msn'] = $profile['msn']['name'];
 		if ($profile['yim']['name'] != '' && !(!empty($modSettings['guest_hideContacts']) && $user_info['is_guest']))
 			$data['yim'] = $profile['yim']['name'];
+		if (!empty($profile['skype']['name']) && !(!empty($modSettings['guest_hideContacts']) && $user_info['is_guest']))
+			$data['skype'] = $profile['skype']['name'];
 
 		if ($profile['website']['title'] != '')
 			$data['website'] = array(

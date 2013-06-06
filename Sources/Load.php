@@ -7,14 +7,14 @@
  *
  * @package SMF
  * @author Simple Machines http://www.simplemachines.org
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
  */
 
 if (!defined('SMF'))
-	die('Hacking attempt...');
+	die('No direct access...');
 
 /**
  * Load the $modSettings array.
@@ -25,7 +25,7 @@ if (!defined('SMF'))
  */
 function reloadSettings()
 {
-	global $modSettings, $boarddir, $smcFunc, $txt, $db_character_set, $context, $sourcedir;
+	global $modSettings, $boarddir, $smcFunc, $txt, $db_character_set, $sourcedir;
 
 	// Most database systems have not set UTF-8 as their default input charset.
 	if (!empty($db_character_set))
@@ -63,21 +63,21 @@ function reloadSettings()
 			cache_put_data('modSettings', $modSettings, 90);
 	}
 
-	// UTF-8 in regular expressions is unsupported on PHP(win) versions < 4.2.3.
+	// UTF-8 ?
 	$utf8 = (empty($modSettings['global_character_set']) ? $txt['lang_character_set'] : $modSettings['global_character_set']) === 'UTF-8';
 
 	// Set a list of common functions.
 	$ent_list = empty($modSettings['disableEntityCheck']) ? '&(#\d{1,7}|quot|amp|lt|gt|nbsp);' : '&(#021|quot|amp|lt|gt|nbsp);';
-	$ent_check = empty($modSettings['disableEntityCheck']) ? array('preg_replace(\'~(&#(\d{1,7}|x[0-9a-fA-F]{1,6});)~e\', \'$smcFunc[\\\'entity_fix\\\'](\\\'\\2\\\')\', ', ')') : array('', '');
+	$ent_check = empty($modSettings['disableEntityCheck']) ? array('preg_replace_callback(\'~(&#(\d{1,7}|x[0-9a-fA-F]{1,6});)~\', \'entity_fix__callback\', ', ')') : array('', '');
 
-	// Preg_replace can handle complex characters only for higher PHP versions.
+	// Preg_replace space characters depend on the character set in use
 	$space_chars = $utf8 ? '\x{A0}\x{AD}\x{2000}-\x{200F}\x{201F}\x{202F}\x{3000}\x{FEFF}' : '\x00-\x08\x0B\x0C\x0E-\x19\xA0';
 
 	// global array of anonymous helper functions, used mosly to properly handle multi byte strings
 	$smcFunc += array(
 		'entity_fix' => create_function('$string', '
 			$num = $string[0] === \'x\' ? hexdec(substr($string, 1)) : (int) $string;
-			return $num < 0x20 || $num > 0x10FFFF || ($num >= 0xD800 && $num <= 0xDFFF) || $num == 0x202E ? \'\' : \'&#\' . $num . \';\';'),
+			return $num < 0x20 || $num > 0x10FFFF || ($num >= 0xD800 && $num <= 0xDFFF) || $num === 0x202E || $num === 0x202D ? \'\' : \'&#\' . $num . \';\';'),
 		'htmlspecialchars' => create_function('$string, $quote_style = ENT_COMPAT, $charset = \'ISO-8859-1\'', '
 			global $smcFunc;
 			return ' . strtr($ent_check[0], array('&' => '&amp;')) . 'htmlspecialchars($string, $quote_style, ' . ($utf8 ? '\'UTF-8\'' : '$charset') . ')' . $ent_check[1] . ';'),
@@ -507,7 +507,7 @@ function loadBoard()
 		$_REQUEST['msg'] = (int) $_REQUEST['msg'];
 
 		// Looking through the message table can be slow, so try using the cache first.
-		if (($topic = cache_get_data('msg_topic-' . $_REQUEST['msg'], 120)) === NULL)
+		if (($topic = cache_get_data('msg_topic-' . $_REQUEST['msg'], 120)) === null)
 		{
 			$request = $smcFunc['db_query']('', '
 				SELECT id_topic
@@ -543,7 +543,7 @@ function loadBoard()
 	// Load this board only if it is specified.
 	if (empty($board) && empty($topic))
 	{
-		$board_info = array('moderators' => array());
+		$board_info = array('moderators' => array(), 'moderator_groups' => array());
 		return;
 	}
 
@@ -567,13 +567,16 @@ function loadBoard()
 		$request = $smcFunc['db_query']('', '
 			SELECT
 				c.id_cat, b.name AS bname, b.description, b.num_topics, b.member_groups, b.deny_member_groups,
-				b.id_parent, c.name AS cname, IFNULL(mem.id_member, 0) AS id_moderator,
+				b.id_parent, c.name AS cname, IFNULL(mg.id_group, 0) AS id_moderator_group, mg.group_name,
+				IFNULL(mem.id_member, 0) AS id_moderator,
 				mem.real_name' . (!empty($topic) ? ', b.id_board' : '') . ', b.child_level,
 				b.id_theme, b.override_theme, b.count_posts, b.id_profile, b.redirect,
 				b.unapproved_topics, b.unapproved_posts' . (!empty($topic) ? ', t.approved, t.id_member_started' : '') . '
 			FROM {db_prefix}boards AS b' . (!empty($topic) ? '
 				INNER JOIN {db_prefix}topics AS t ON (t.id_topic = {int:current_topic})' : '') . '
 				LEFT JOIN {db_prefix}categories AS c ON (c.id_cat = b.id_cat)
+				LEFT JOIN {db_prefix}moderator_groups AS modgs ON (modgs.id_board = {raw:board_link})
+				LEFT JOIN {db_prefix}membergroups AS mg ON (mg.id_group = modgs.id_group)
 				LEFT JOIN {db_prefix}moderators AS mods ON (mods.id_board = {raw:board_link})
 				LEFT JOIN {db_prefix}members AS mem ON (mem.id_member = mods.id_member)
 			WHERE b.id_board = {raw:board_link}',
@@ -595,6 +598,7 @@ function loadBoard()
 			$board_info = array(
 				'id' => $board,
 				'moderators' => array(),
+				'moderator_groups' => array(),
 				'cat' => array(
 					'id' => $row['id_cat'],
 					'name' => $row['cname']
@@ -629,6 +633,14 @@ function loadBoard()
 						'name' => $row['real_name'],
 						'href' => $scripturl . '?action=profile;u=' . $row['id_moderator'],
 						'link' => '<a href="' . $scripturl . '?action=profile;u=' . $row['id_moderator'] . '">' . $row['real_name'] . '</a>'
+					);
+
+				if (!empty($row['id_moderator_group']))
+					$board_info['moderator_groups'][$row['id_moderator_group']] = array(
+						'id' => $row['id_moderator_group'],
+						'name' => $row['group_name'],
+						'href' => $scripturl . '?action=groups;sa=members;group=' . $row['id_moderator_group'],
+						'link' => '<a href="' . $scripturl . '?action=groups;sa=members;group=' . $row['id_moderator_group'] . '">' . $row['group_name'] . '</a>'
 					);
 			}
 			while ($row = $smcFunc['db_fetch_assoc']($request));
@@ -671,6 +683,7 @@ function loadBoard()
 			// Otherwise the topic is invalid, there are no moderators, etc.
 			$board_info = array(
 				'moderators' => array(),
+				'moderator_groups' => array(),
 				'error' => 'exist'
 			);
 			$topic = null;
@@ -684,8 +697,11 @@ function loadBoard()
 
 	if (!empty($board))
 	{
+		// Get this into an array of keys for array_intersect
+		$moderator_groups = array_keys($board_info['moderator_groups']);
+		
 		// Now check if the user is a moderator.
-		$user_info['is_mod'] = isset($board_info['moderators'][$user_info['id']]);
+		$user_info['is_mod'] = isset($board_info['moderators'][$user_info['id']]) || count(array_intersect($user_info['groups'], $moderator_groups)) != 0;
 
 		if (count(array_intersect($user_info['groups'], $board_info['groups'])) == 0 && !$user_info['is_admin'])
 			$board_info['error'] = 'access';
@@ -876,11 +892,14 @@ function loadPermissions()
  */
 function loadMemberData($users, $is_name = false, $set = 'normal')
 {
-	global $user_profile, $modSettings, $board_info, $smcFunc;
+	global $user_profile, $modSettings, $board_info, $smcFunc, $context;
 
 	// Can't just look for no users :P.
 	if (empty($users))
 		return false;
+
+	// Pass the set value
+	$context['loadMemberContext_set'] = $set;
 
 	// Make sure it's an array.
 	$users = !is_array($users) ? array($users) : array_unique($users);
@@ -901,56 +920,47 @@ function loadMemberData($users, $is_name = false, $set = 'normal')
 		}
 	}
 
-	if ($set == 'normal')
-	{
-		$select_columns = '
+	// Used by default
+	$select_columns = '
 			IFNULL(lo.log_time, 0) AS is_online, IFNULL(a.id_attach, 0) AS id_attach, a.filename, a.attachment_type,
 			mem.signature, mem.personal_text, mem.location, mem.gender, mem.avatar, mem.id_member, mem.member_name,
 			mem.real_name, mem.email_address, mem.hide_email, mem.date_registered, mem.website_title, mem.website_url,
-			mem.birthdate, mem.member_ip, mem.member_ip2, mem.icq, mem.aim, mem.yim, mem.msn, mem.posts, mem.last_login,
+			mem.birthdate, mem.member_ip, mem.member_ip2, mem.icq, mem.aim, mem.yim, mem.skype, mem.posts, mem.last_login,
 			mem.karma_good, mem.id_post_group, mem.karma_bad, mem.lngfile, mem.id_group, mem.time_offset, mem.show_online,
-			mem.buddy_list, mg.online_color AS member_group_color, IFNULL(mg.group_name, {string:blank_string}) AS member_group,
-			pg.online_color AS post_group_color, IFNULL(pg.group_name, {string:blank_string}) AS post_group, mem.is_activated, mem.warning,
-			CASE WHEN mem.id_group = 0 OR mg.icons = {string:blank_string} THEN pg.icons ELSE mg.icons END AS icons' . (!empty($modSettings['titlesEnable']) ? ',
-			mem.usertitle' : '');
-		$select_tables = '
+			mg.online_color AS member_group_color, IFNULL(mg.group_name, {string:blank_string}) AS member_group,
+			pg.online_color AS post_group_color, IFNULL(pg.group_name, {string:blank_string}) AS post_group,
+			mem.is_activated, mem.warning, ' . (!empty($modSettings['titlesEnable']) ? 'mem.usertitle, ' : '') . '
+			CASE WHEN mem.id_group = 0 OR mg.icons = {string:blank_string} THEN pg.icons ELSE mg.icons END AS icons';
+	$select_tables = '
 			LEFT JOIN {db_prefix}log_online AS lo ON (lo.id_member = mem.id_member)
 			LEFT JOIN {db_prefix}attachments AS a ON (a.id_member = mem.id_member)
 			LEFT JOIN {db_prefix}membergroups AS pg ON (pg.id_group = mem.id_post_group)
 			LEFT JOIN {db_prefix}membergroups AS mg ON (mg.id_group = mem.id_group)';
-	}
-	elseif ($set == 'profile')
+
+	// We add or replace according the the set
+	switch ($set)
 	{
-		$select_columns = '
-			IFNULL(lo.log_time, 0) AS is_online, IFNULL(a.id_attach, 0) AS id_attach, a.filename, a.attachment_type,
-			mem.signature, mem.personal_text, mem.location, mem.gender, mem.avatar, mem.id_member, mem.member_name,
-			mem.real_name, mem.email_address, mem.hide_email, mem.date_registered, mem.website_title, mem.website_url,
-			mem.openid_uri, mem.birthdate, mem.icq, mem.aim, mem.yim, mem.msn, mem.posts, mem.last_login, mem.karma_good,
-			mem.karma_bad, mem.member_ip, mem.member_ip2, mem.lngfile, mem.id_group, mem.id_theme, mem.buddy_list,
-			mem.pm_ignore_list, mem.pm_email_notify, mem.pm_receive_from, mem.time_offset' . (!empty($modSettings['titlesEnable']) ? ', mem.usertitle' : '') . ',
-			mem.time_format, mem.secret_question, mem.is_activated, mem.additional_groups, mem.smiley_set, mem.show_online,
-			mem.total_time_logged_in, mem.id_post_group, mem.notify_announcements, mem.notify_regularity, mem.notify_send_body,
-			mem.notify_types, lo.url, mg.online_color AS member_group_color, IFNULL(mg.group_name, {string:blank_string}) AS member_group,
-			pg.online_color AS post_group_color, IFNULL(pg.group_name, {string:blank_string}) AS post_group, mem.ignore_boards, mem.warning,
-			CASE WHEN mem.id_group = 0 OR mg.icons = {string:blank_string} THEN pg.icons ELSE mg.icons END AS icons, mem.password_salt, mem.pm_prefs';
-		$select_tables = '
-			LEFT JOIN {db_prefix}log_online AS lo ON (lo.id_member = mem.id_member)
-			LEFT JOIN {db_prefix}attachments AS a ON (a.id_member = mem.id_member)
-			LEFT JOIN {db_prefix}membergroups AS pg ON (pg.id_group = mem.id_post_group)
-			LEFT JOIN {db_prefix}membergroups AS mg ON (mg.id_group = mem.id_group)';
-	}
-	elseif ($set == 'minimal')
-	{
-		$select_columns = '
+		case 'normal':
+			$select_columns .= ', mem.buddy_list,  mem.additional_groups';
+			break;
+		case 'profile':
+			$select_columns .= ', mem.additional_groups, mem.openid_uri, mem.id_theme, mem.pm_ignore_list, mem.pm_email_notify, mem.pm_receive_from,
+			mem.time_format, mem.secret_question, mem.smiley_set,
+			mem.total_time_logged_in, mem.notify_announcements, mem.notify_regularity, mem.notify_send_body,
+			mem.notify_types, lo.url, mem.ignore_boards, mem.password_salt, mem.pm_prefs, mem.buddy_list';
+			break;
+		case 'minimal':
+			$select_columns = '
 			mem.id_member, mem.member_name, mem.real_name, mem.email_address, mem.hide_email, mem.date_registered,
 			mem.posts, mem.last_login, mem.member_ip, mem.member_ip2, mem.lngfile, mem.id_group';
-		$select_tables = '';
+			$select_tables = '';
+			break;
+		default:
+			trigger_error('loadMemberData(): Invalid member data set \'' . $set . '\'', E_USER_WARNING);
 	}
-	else
-		trigger_error('loadMemberData(): Invalid member data set \'' . $set . '\'', E_USER_WARNING);
 
 	// Allow mods to easily add to the selected member data
-	call_integration_hook('integrate_load_member_data', array(&$select_columns, &$select_tables));
+	call_integration_hook('integrate_load_member_data', array(&$select_columns, &$select_tables, &$set));
 
 	if (!empty($users))
 	{
@@ -958,10 +968,10 @@ function loadMemberData($users, $is_name = false, $set = 'normal')
 		$request = $smcFunc['db_query']('', '
 			SELECT' . $select_columns . '
 			FROM {db_prefix}members AS mem' . $select_tables . '
-			WHERE mem.' . ($is_name ? 'member_name' : 'id_member') . (count($users) == 1 ? ' = {' . ($is_name ? 'string' : 'int') . ':users}' : ' IN ({' . ($is_name ? 'array_string' : 'array_int') . ':users})'),
+			WHERE mem.' . ($is_name ? 'member_name' : 'id_member') . ' IN ({' . ($is_name ? 'array_string' : 'array_int') . ':users})',
 			array(
 				'blank_string' => '',
-				'users' => count($users) == 1 ? current($users) : $users,
+				'users' => $users,
 			)
 		);
 		$new_loaded_ids = array();
@@ -980,14 +990,35 @@ function loadMemberData($users, $is_name = false, $set = 'normal')
 		$request = $smcFunc['db_query']('', '
 			SELECT *
 			FROM {db_prefix}themes
-			WHERE id_member' . (count($new_loaded_ids) == 1 ? ' = {int:loaded_ids}' : ' IN ({array_int:loaded_ids})'),
+			WHERE id_member IN ({array_int:loaded_ids})',
 			array(
-				'loaded_ids' => count($new_loaded_ids) == 1 ? $new_loaded_ids[0] : $new_loaded_ids,
+				'loaded_ids' => $new_loaded_ids,
 			)
 		);
 		while ($row = $smcFunc['db_fetch_assoc']($request))
 			$user_profile[$row['id_member']]['options'][$row['variable']] = $row['value'];
 		$smcFunc['db_free_result']($request);
+	}
+
+	$additional_mods = array();
+	
+	// Are any of these users in groups assigned to moderate this board?
+	if (!empty($loaded_ids) && !empty($board_info['moderator_groups']) && $set === 'normal')
+	{
+		foreach ($loaded_ids as $a_member)
+		{
+			if (!empty($user_profile[$a_member]['additional_groups']))
+				$groups = array_merge(array($user_profile[$a_member]['id_group']), explode(',', $user_profile[$a_member]['additional_groups']));
+			else
+				$groups = array($user_profile[$a_member]['id_group']);
+			
+			$temp = array_intersect($groups, array_keys($board_info['moderator_groups']));
+			
+			if (!empty($temp))
+			{
+				$additional_mods[] = $a_member;
+			}
+		}
 	}
 
 	if (!empty($new_loaded_ids) && !empty($modSettings['cache_enable']) && $modSettings['cache_enable'] >= 3)
@@ -997,7 +1028,7 @@ function loadMemberData($users, $is_name = false, $set = 'normal')
 	}
 
 	// Are we loading any moderators?  If so, fix their group data...
-	if (!empty($loaded_ids) && !empty($board_info['moderators']) && $set === 'normal' && count($temp_mods = array_intersect($loaded_ids, array_keys($board_info['moderators']))) !== 0)
+	if (!empty($loaded_ids) && (!empty($board_info['moderators']) || !empty($board_info['moderator_groups'])) && $set === 'normal' && count($temp_mods = array_merge(array_intersect($loaded_ids, array_keys($board_info['moderators'])), $additional_mods)) !== 0)
 	{
 		if (($row = cache_get_data('moderator_group_info', 480)) == null)
 		{
@@ -1038,12 +1069,12 @@ function loadMemberData($users, $is_name = false, $set = 'normal')
  *
  * @param int $user
  * @param bool $display_custom_fields = false
- * @return bool
+ * @return boolean
  */
 function loadMemberContext($user, $display_custom_fields = false)
 {
 	global $memberContext, $user_profile, $txt, $scripturl, $user_info;
-	global $context, $modSettings, $board_info, $settings;
+	global $context, $modSettings, $settings;
 	global $smcFunc;
 	static $dataLoaded = array();
 
@@ -1092,102 +1123,111 @@ function loadMemberContext($user, $display_custom_fields = false)
 		$avatar_height = '';
 	}
 
-	// What a monstrous array...
+	// These minimal values are always loaded
 	$memberContext[$user] = array(
 		'username' => $profile['member_name'],
 		'name' => $profile['real_name'],
 		'id' => $profile['id_member'],
-		'is_buddy' => $profile['buddy'],
-		'is_reverse_buddy' => in_array($user_info['id'], $buddy_list),
-		'buddies' => $buddy_list,
-		'title' => !empty($modSettings['titlesEnable']) ? $profile['usertitle'] : '',
 		'href' => $scripturl . '?action=profile;u=' . $profile['id_member'],
 		'link' => '<a href="' . $scripturl . '?action=profile;u=' . $profile['id_member'] . '" title="' . $txt['profile_of'] . ' ' . $profile['real_name'] . '">' . $profile['real_name'] . '</a>',
 		'email' => $profile['email_address'],
 		'show_email' => showEmailAddress(!empty($profile['hide_email']), $profile['id_member']),
 		'registered' => empty($profile['date_registered']) ? $txt['not_applicable'] : timeformat($profile['date_registered']),
 		'registered_timestamp' => empty($profile['date_registered']) ? 0 : forum_time(true, $profile['date_registered']),
-		'blurb' => $profile['personal_text'],
-		'gender' => array(
-			'name' => $gendertxt,
-			'image' => !empty($profile['gender']) ? '<img class="gender" src="' . $settings['images_url'] . '/' . ($profile['gender'] == 1 ? 'Male' : 'Female') . '.png" alt="' . $gendertxt . '" />' : ''
-		),
-		'website' => array(
-			'title' => $profile['website_title'],
-			'url' => $profile['website_url'],
-		),
-		'birth_date' => empty($profile['birthdate']) || $profile['birthdate'] === '0001-01-01' ? '0000-00-00' : (substr($profile['birthdate'], 0, 4) === '0004' ? '0000' . substr($profile['birthdate'], 4) : $profile['birthdate']),
-		'signature' => $profile['signature'],
-		'location' => $profile['location'],
-		'icq' => $profile['icq'] != '' && (empty($modSettings['guest_hideContacts']) || !$user_info['is_guest']) ? array(
-			'name' => $profile['icq'],
-			'href' => 'http://www.icq.com/whitepages/about_me.php?uin=' . $profile['icq'],
-			'link' => '<a class="icq new_win" href="http://www.icq.com/whitepages/about_me.php?uin=' . $profile['icq'] . '" target="_blank" title="' . $txt['icq_title'] . ' - ' . $profile['icq'] . '"><img src="http://status.icq.com/online.png?img=5&amp;icq=' . $profile['icq'] . '" alt="' . $txt['icq_title'] . ' - ' . $profile['icq'] . '" width="18" height="18" /></a>',
-			'link_text' => '<a class="icq extern" href="http://www.icq.com/whitepages/about_me.php?uin=' . $profile['icq'] . '" title="' . $txt['icq_title'] . ' - ' . $profile['icq'] . '">' . $profile['icq'] . '</a>',
-		) : array('name' => '', 'add' => '', 'href' => '', 'link' => '', 'link_text' => ''),
-		'aim' => $profile['aim'] != '' && (empty($modSettings['guest_hideContacts']) || !$user_info['is_guest']) ? array(
-			'name' => $profile['aim'],
-			'href' => 'aim:goim?screenname=' . urlencode(strtr($profile['aim'], array(' ' => '%20'))) . '&amp;message=' . $txt['aim_default_message'],
-			'link' => '<a class="aim" href="aim:goim?screenname=' . urlencode(strtr($profile['aim'], array(' ' => '%20'))) . '&amp;message=' . $txt['aim_default_message'] . '" title="' . $txt['aim_title'] . ' - ' . $profile['aim'] . '"><img src="' . $settings['images_url'] . '/aim.png" alt="' . $txt['aim_title'] . ' - ' . $profile['aim'] . '" /></a>',
-			'link_text' => '<a class="aim" href="aim:goim?screenname=' . urlencode(strtr($profile['aim'], array(' ' => '%20'))) . '&amp;message=' . $txt['aim_default_message'] . '" title="' . $txt['aim_title'] . ' - ' . $profile['aim'] . '">' . $profile['aim'] . '</a>'
-		) : array('name' => '', 'href' => '', 'link' => '', 'link_text' => ''),
-		'yim' => $profile['yim'] != '' && (empty($modSettings['guest_hideContacts']) || !$user_info['is_guest']) ? array(
-			'name' => $profile['yim'],
-			'href' => 'http://edit.yahoo.com/config/send_webmesg?.target=' . urlencode($profile['yim']),
-			'link' => '<a class="yim" href="http://edit.yahoo.com/config/send_webmesg?.target=' . urlencode($profile['yim']) . '" title="' . $txt['yim_title'] . ' - ' . $profile['yim'] . '"><img src="http://opi.yahoo.com/online?u=' . urlencode($profile['yim']) . '&amp;m=g&amp;t=0" alt="' . $txt['yim_title'] . ' - ' . $profile['yim'] . '" /></a>',
-			'link_text' => '<a class="yim" href="http://edit.yahoo.com/config/send_webmesg?.target=' . urlencode($profile['yim']) . '" title="' . $txt['yim_title'] . ' - ' . $profile['yim'] . '">' . $profile['yim'] . '</a>'
-		) : array('name' => '', 'href' => '', 'link' => '', 'link_text' => ''),
-		'msn' => $profile['msn'] !='' && (empty($modSettings['guest_hideContacts']) || !$user_info['is_guest']) ? array(
-			'name' => $profile['msn'],
-			'href' => 'http://members.msn.com/' . $profile['msn'],
-			'link' => '<a class="msn new_win" href="http://members.msn.com/' . $profile['msn'] . '" title="' . $txt['msn_title'] . ' - ' . $profile['msn'] . '"><img src="' . $settings['images_url'] . '/msntalk.png" alt="' . $txt['msn_title'] . ' - ' . $profile['msn'] . '" /></a>',
-			'link_text' => '<a class="msn new_win" href="http://members.msn.com/' . $profile['msn'] . '" title="' . $txt['msn_title'] . ' - ' . $profile['msn'] . '">' . $profile['msn'] . '</a>'
-		) : array('name' => '', 'href' => '', 'link' => '', 'link_text' => ''),
-		'real_posts' => $profile['posts'],
-		'posts' => $profile['posts'] > 500000 ? $txt['geek'] : comma_format($profile['posts']),
-		'avatar' => array(
-			'name' => $profile['avatar'],
-			'image' => $profile['avatar'] == '' ? ($profile['id_attach'] > 0 ? '<img class="avatar" src="' . (empty($profile['attachment_type']) ? $scripturl . '?action=dlattach;attach=' . $profile['id_attach'] . ';type=avatar' : $modSettings['custom_avatar_url'] . '/' . $profile['filename']) . '" alt="" />' : '') : (stristr($profile['avatar'], 'http://') ? '<img class="avatar" src="' . $profile['avatar'] . '"' . $avatar_width . $avatar_height . ' alt="" />' : '<img class="avatar" src="' . $modSettings['avatar_url'] . '/' . htmlspecialchars($profile['avatar']) . '" alt="" />'),
-			'href' => $profile['avatar'] == '' ? ($profile['id_attach'] > 0 ? (empty($profile['attachment_type']) ? $scripturl . '?action=dlattach;attach=' . $profile['id_attach'] . ';type=avatar' : $modSettings['custom_avatar_url'] . '/' . $profile['filename']) : '') : (stristr($profile['avatar'], 'http://') ? $profile['avatar'] : $modSettings['avatar_url'] . '/' . $profile['avatar']),
-			'url' => $profile['avatar'] == '' ? '' : (stristr($profile['avatar'], 'http://') ? $profile['avatar'] : $modSettings['avatar_url'] . '/' . $profile['avatar'])
-		),
-		'last_login' => empty($profile['last_login']) ? $txt['never'] : timeformat($profile['last_login']),
-		'last_login_timestamp' => empty($profile['last_login']) ? 0 : forum_time(0, $profile['last_login']),
-		'karma' => array(
-			'good' => $profile['karma_good'],
-			'bad' => $profile['karma_bad'],
-			'allow' => !$user_info['is_guest'] && !empty($modSettings['karmaMode']) && $user_info['id'] != $user && allowedTo('karma_edit') &&
-			($user_info['posts'] >= $modSettings['karmaMinPosts'] || $user_info['is_admin']),
-		),
-		'ip' => htmlspecialchars($profile['member_ip']),
-		'ip2' => htmlspecialchars($profile['member_ip2']),
-		'online' => array(
-			'is_online' => $profile['is_online'],
-			'text' => $txt[$profile['is_online'] ? 'online' : 'offline'],
-			'href' => $scripturl . '?action=pm;sa=send;u=' . $profile['id_member'],
-			'link' => '<a href="' . $scripturl . '?action=pm;sa=send;u=' . $profile['id_member'] . '">' . $txt[$profile['is_online'] ? 'online' : 'offline'] . '</a>',
-			'image_href' => $settings['images_url'] . '/' . ($profile['buddy'] ? 'buddy_' : '') . ($profile['is_online'] ? 'useron' : 'useroff') . '.png',
-			'label' => $txt[$profile['is_online'] ? 'online' : 'offline']
-		),
-		'language' => $smcFunc['ucwords'](strtr($profile['lngfile'], array('_' => ' ', '-utf8' => ''))),
-		'is_activated' => isset($profile['is_activated']) ? $profile['is_activated'] : 1,
-		'is_banned' => isset($profile['is_activated']) ? $profile['is_activated'] >= 10 : 0,
-		'options' => $profile['options'],
-		'is_guest' => false,
-		'group' => $profile['member_group'],
-		'group_color' => $profile['member_group_color'],
-		'group_id' => $profile['id_group'],
-		'post_group' => $profile['post_group'],
-		'post_group_color' => $profile['post_group_color'],
-		'group_icons' => str_repeat('<img src="' . str_replace('$language', $context['user']['language'], isset($profile['icons'][1]) ? $settings['images_url'] . '/' . $profile['icons'][1] : '') . '" alt="*" />', empty($profile['icons'][0]) || empty($profile['icons'][1]) ? 0 : $profile['icons'][0]),
-		'warning' => $profile['warning'],
-		'warning_status' => !empty($modSettings['warning_mute']) && $modSettings['warning_mute'] <= $profile['warning'] ? 'mute' : (!empty($modSettings['warning_moderate']) && $modSettings['warning_moderate'] <= $profile['warning'] ? 'moderate' : (!empty($modSettings['warning_watch']) && $modSettings['warning_watch'] <= $profile['warning'] ? 'watch' : (''))),
-		'local_time' => timeformat(time() + ($profile['time_offset'] - $user_info['time_offset']) * 3600, false),
 	);
+
+	// If the set isn't minimal then load the monstrous array.
+	if ($context['loadMemberContext_set'] != 'minimal')
+		$memberContext[$user] += array(
+			'username_color' => '<span '. (!empty($profile['member_group_color']) ? 'style="color:'. $profile['member_group_color'] .';"' : '') .'>'. $profile['member_name'] .'</span>',
+			'name_color' => '<span '. (!empty($profile['member_group_color']) ? 'style="color:'. $profile['member_group_color'] .';"' : '') .'>'. $profile['real_name'] .'</span>',
+			'link_color' => '<a href="' . $scripturl . '?action=profile;u=' . $profile['id_member'] . '" title="' . $txt['profile_of'] . ' ' . $profile['real_name'] . '" '. (!empty($profile['member_group_color']) ? 'style="color:'. $profile['member_group_color'] .';"' : '') .'>' . $profile['real_name'] . '</a>',
+			'is_buddy' => $profile['buddy'],
+			'is_reverse_buddy' => in_array($user_info['id'], $buddy_list),
+			'buddies' => $buddy_list,
+			'title' => !empty($modSettings['titlesEnable']) ? $profile['usertitle'] : '',
+			'blurb' => $profile['personal_text'],
+			'gender' => array(
+				'name' => $gendertxt,
+				'image' => !empty($profile['gender']) ? '<img class="gender" src="' . $settings['images_url'] . '/' . ($profile['gender'] == 1 ? 'Male' : 'Female') . '.png" alt="' . $gendertxt . '" />' : ''
+			),
+			'website' => array(
+				'title' => $profile['website_title'],
+				'url' => $profile['website_url'],
+			),
+			'birth_date' => empty($profile['birthdate']) || $profile['birthdate'] === '0001-01-01' ? '0000-00-00' : (substr($profile['birthdate'], 0, 4) === '0004' ? '0000' . substr($profile['birthdate'], 4) : $profile['birthdate']),
+			'signature' => $profile['signature'],
+			'location' => $profile['location'],
+			'icq' => $profile['icq'] != '' && (empty($modSettings['guest_hideContacts']) || !$user_info['is_guest']) ? array(
+				'name' => $profile['icq'],
+				'href' => 'http://www.icq.com/whitepages/about_me.php?uin=' . $profile['icq'],
+				'link' => '<a class="icq new_win" href="http://www.icq.com/whitepages/about_me.php?uin=' . $profile['icq'] . '" target="_blank" title="' . $txt['icq_title'] . ' - ' . $profile['icq'] . '"><img src="http://status.icq.com/online.png?img=5&amp;icq=' . $profile['icq'] . '" alt="' . $txt['icq_title'] . ' - ' . $profile['icq'] . '" width="18" height="18" /></a>',
+				'link_text' => '<a class="icq extern" href="http://www.icq.com/whitepages/about_me.php?uin=' . $profile['icq'] . '" title="' . $txt['icq_title'] . ' - ' . $profile['icq'] . '">' . $profile['icq'] . '</a>',
+			) : array('name' => '', 'add' => '', 'href' => '', 'link' => '', 'link_text' => ''),
+			'aim' => $profile['aim'] != '' && (empty($modSettings['guest_hideContacts']) || !$user_info['is_guest']) ? array(
+				'name' => $profile['aim'],
+				'href' => 'aim:goim?screenname=' . urlencode(strtr($profile['aim'], array(' ' => '%20'))) . '&amp;message=' . $txt['aim_default_message'],
+				'link' => '<a class="aim" href="aim:goim?screenname=' . urlencode(strtr($profile['aim'], array(' ' => '%20'))) . '&amp;message=' . $txt['aim_default_message'] . '" title="' . $txt['aim_title'] . ' - ' . $profile['aim'] . '"><img src="' . $settings['images_url'] . '/aim.png" alt="' . $txt['aim_title'] . ' - ' . $profile['aim'] . '" /></a>',
+				'link_text' => '<a class="aim" href="aim:goim?screenname=' . urlencode(strtr($profile['aim'], array(' ' => '%20'))) . '&amp;message=' . $txt['aim_default_message'] . '" title="' . $txt['aim_title'] . ' - ' . $profile['aim'] . '">' . $profile['aim'] . '</a>'
+			) : array('name' => '', 'href' => '', 'link' => '', 'link_text' => ''),
+			'yim' => $profile['yim'] != '' && (empty($modSettings['guest_hideContacts']) || !$user_info['is_guest']) ? array(
+				'name' => $profile['yim'],
+				'href' => 'http://edit.yahoo.com/config/send_webmesg?.target=' . urlencode($profile['yim']),
+				'link' => '<a class="yim" href="http://edit.yahoo.com/config/send_webmesg?.target=' . urlencode($profile['yim']) . '" title="' . $txt['yim_title'] . ' - ' . $profile['yim'] . '"><img src="http://opi.yahoo.com/online?u=' . urlencode($profile['yim']) . '&amp;m=g&amp;t=0" alt="' . $txt['yim_title'] . ' - ' . $profile['yim'] . '" /></a>',
+				'link_text' => '<a class="yim" href="http://edit.yahoo.com/config/send_webmesg?.target=' . urlencode($profile['yim']) . '" title="' . $txt['yim_title'] . ' - ' . $profile['yim'] . '">' . $profile['yim'] . '</a>'
+			) : array('name' => '', 'href' => '', 'link' => '', 'link_text' => ''),
+			'skype' => !empty($profile['skype']) && (empty($modSettings['guest_hideContacts']) || !$user_info['is_guest']) ? array(
+				'name' => $profile['skype'],
+				'href' => 'skype:' . $profile['skype'] . '?chat',
+				'link' => '<a class="skype new_win" href="skype:' . $profile['skype'] . '?chat" title="' . $txt['skype'] . ' - ' . $profile['skype'] . '"><img src="' . $settings['images_url'] . '/skype.png" alt="' . $txt['skype'] . ' - ' . $profile['skype'] . '" /></a>',
+				'link_text' => '<a class="skype new_win" href="skype:' . $profile['skype'] . '?chat" title="' . $txt['skype'] . ' - ' . $profile['skype'] . '">' . $profile['skype'] . '</a>',
+			) : array('name' => '', 'href' => '', 'link' => '', 'link_text' => '',),
+			'real_posts' => $profile['posts'],
+			'posts' => $profile['posts'] > 500000 ? $txt['geek'] : comma_format($profile['posts']),
+			'avatar' => array(
+				'name' => $profile['avatar'],
+				'image' => $profile['avatar'] == '' ? ($profile['id_attach'] > 0 ? '<img class="avatar" src="' . (empty($profile['attachment_type']) ? $scripturl . '?action=dlattach;attach=' . $profile['id_attach'] . ';type=avatar' : $modSettings['custom_avatar_url'] . '/' . $profile['filename']) . '" alt="" />' : '') : (stristr($profile['avatar'], 'http://') ? '<img class="avatar" src="' . $profile['avatar'] . '"' . $avatar_width . $avatar_height . ' alt="" />' : '<img class="avatar" src="' . $modSettings['avatar_url'] . '/' . htmlspecialchars($profile['avatar']) . '" alt="" />'),
+				'href' => $profile['avatar'] == '' ? ($profile['id_attach'] > 0 ? (empty($profile['attachment_type']) ? $scripturl . '?action=dlattach;attach=' . $profile['id_attach'] . ';type=avatar' : $modSettings['custom_avatar_url'] . '/' . $profile['filename']) : '') : (stristr($profile['avatar'], 'http://') ? $profile['avatar'] : $modSettings['avatar_url'] . '/' . $profile['avatar']),
+				'url' => $profile['avatar'] == '' ? '' : (stristr($profile['avatar'], 'http://') ? $profile['avatar'] : $modSettings['avatar_url'] . '/' . $profile['avatar'])
+			),
+			'last_login' => empty($profile['last_login']) ? $txt['never'] : timeformat($profile['last_login']),
+			'last_login_timestamp' => empty($profile['last_login']) ? 0 : forum_time(0, $profile['last_login']),
+			'karma' => array(
+				'good' => $profile['karma_good'],
+				'bad' => $profile['karma_bad'],
+				'allow' => !$user_info['is_guest'] && !empty($modSettings['karmaMode']) && $user_info['id'] != $user && allowedTo('karma_edit') &&
+				($user_info['posts'] >= $modSettings['karmaMinPosts'] || $user_info['is_admin']),
+			),
+			'ip' => htmlspecialchars($profile['member_ip']),
+			'ip2' => htmlspecialchars($profile['member_ip2']),
+			'online' => array(
+				'is_online' => $profile['is_online'],
+				'text' => $smcFunc['htmlspecialchars']($txt[$profile['is_online'] ? 'online' : 'offline']),
+				'member_online_text' => sprintf($txt[$profile['is_online'] ? 'member_is_online' : 'member_is_offline'], $smcFunc['htmlspecialchars']($profile['real_name'])),
+				'href' => $scripturl . '?action=pm;sa=send;u=' . $profile['id_member'],
+				'link' => '<a href="' . $scripturl . '?action=pm;sa=send;u=' . $profile['id_member'] . '">' . $txt[$profile['is_online'] ? 'online' : 'offline'] . '</a>',
+				'image_href' => $settings['images_url'] . '/' . ($profile['buddy'] ? 'buddy_' : '') . ($profile['is_online'] ? 'useron' : 'useroff') . '.png',
+				'label' => $txt[$profile['is_online'] ? 'online' : 'offline']
+			),
+			'language' => $smcFunc['ucwords'](strtr($profile['lngfile'], array('_' => ' ', '-utf8' => ''))),
+			'is_activated' => isset($profile['is_activated']) ? $profile['is_activated'] : 1,
+			'is_banned' => isset($profile['is_activated']) ? $profile['is_activated'] >= 10 : 0,
+			'options' => $profile['options'],
+			'is_guest' => false,
+			'group' => $profile['member_group'],
+			'group_color' => $profile['member_group_color'],
+			'group_id' => $profile['id_group'],
+			'post_group' => $profile['post_group'],
+			'post_group_color' => $profile['post_group_color'],
+			'group_icons' => str_repeat('<img src="' . str_replace('$language', $context['user']['language'], isset($profile['icons'][1]) ? $settings['images_url'] . '/membericons/' . $profile['icons'][1] : '') . '" alt="*" />', empty($profile['icons'][0]) || empty($profile['icons'][1]) ? 0 : $profile['icons'][0]),
+			'warning' => $profile['warning'],
+			'warning_status' => !empty($modSettings['warning_mute']) && $modSettings['warning_mute'] <= $profile['warning'] ? 'mute' : (!empty($modSettings['warning_moderate']) && $modSettings['warning_moderate'] <= $profile['warning'] ? 'moderate' : (!empty($modSettings['warning_watch']) && $modSettings['warning_watch'] <= $profile['warning'] ? 'watch' : (''))),
+			'local_time' => timeformat(time() + ($profile['time_offset'] - $user_info['time_offset']) * 3600, false),
+		);
 
 	// First do a quick run through to make sure there is something to be shown.
 	$memberContext[$user]['has_messenger'] = false;
-	foreach (array('icq', 'msn', 'aim', 'yim') as $messenger)
+	foreach (array('icq', 'skype', 'aim', 'yim') as $messenger)
 	{
 		if (!isset($context['disabled_fields'][$messenger]) && !empty($memberContext[$user][$messenger]['link']))
 		{
@@ -1237,6 +1277,72 @@ function loadMemberContext($user, $display_custom_fields = false)
 
 	call_integration_hook('integrate_member_context', array(&$user, $display_custom_fields));
 	return true;
+}
+
+/**
+ * Loads the user's custom profile fields
+ *
+ * @param mixed $users either an integer or an array of integers
+ * @param mixed $param either a string or an array of strings with profile fields names
+ * @return array
+ */
+function loadMemberCustomFields($users, $params)
+{
+	global $smcFunc, $txt, $scripturl, $settings;
+
+	// Do not waste my time...
+	if (empty($users) || empty($params))
+		return false;
+
+	// Make sure it's an array.
+	$users = !is_array($users) ? array($users) : array_unique($users);
+	$params = !is_array($params) ? array($params) : array_unique($params);
+	$return = array();
+
+	$request = $smcFunc['db_query']('', '
+		SELECT c.id_field, c.col_name, c.field_name, c.field_desc, c.field_type, c.field_length, c.field_options, c.mask, show_reg,
+		c.show_display, c.show_profile, c.private, c.active, c.bbc, c.can_search, c.default_value, c.enclose, c.placement, t.variable, t.value, t.id_member
+		FROM {db_prefix}themes AS t
+			LEFT JOIN {db_prefix}custom_fields AS c ON (c.col_name = t.variable)
+		WHERE id_member IN ({array_int:loaded_ids}) 
+			AND variable IN ({array_string:params})',
+		array(
+			'loaded_ids' => $users,
+			'params' => $params,
+		)
+	);
+
+	while ($row = $smcFunc['db_fetch_assoc']($request))
+	{
+		// BBC?
+		if (!empty($row['bbc']))
+			$row['value'] = parse_bbc($row['value']);
+
+		// ... or checkbox?
+		elseif (isset($row['type']) && $row['type'] == 'check')
+			$row['value'] = !empty($row['value']) ? $txt['yes'] : $txt['no'];
+
+		// Enclosing the user input within some other text?
+		if (!empty($row['enclose']))
+			$row['value'] = strtr($row['enclose'], array(
+				'{SCRIPTURL}' => $scripturl,
+				'{IMAGES_URL}' => $settings['images_url'],
+				'{DEFAULT_IMAGES_URL}' => $settings['default_images_url'],
+				'{INPUT}' => $row['value'],
+			));
+
+		// Send a simple array if there is just 1 param
+		if (count($params) == 1)
+			$return[$row['id_member']] = $row;
+
+		// More than 1? knock yourself out...
+		else
+			$return[$row['id_member']][$row['id_field']] = $row;
+	}
+
+	$smcFunc['db_free_result']($request);
+
+	return !empty($return) ? $return : false;
 }
 
 /**
@@ -1299,8 +1405,8 @@ function isBrowser($browser)
  */
 function loadTheme($id_theme = 0, $initialize = true)
 {
-	global $user_info, $user_settings, $board_info, $sc, $boarddir;
-	global $txt, $boardurl, $scripturl, $mbname, $modSettings, $language;
+	global $user_info, $user_settings, $board_info, $boarddir;
+	global $txt, $boardurl, $scripturl, $mbname, $modSettings;
 	global $context, $settings, $options, $sourcedir, $ssi_theme, $smcFunc;
 
 	// The theme was specified by parameter.
@@ -1528,6 +1634,14 @@ function loadTheme($id_theme = 0, $initialize = true)
 	// Some basic information...
 	if (!isset($context['html_headers']))
 		$context['html_headers'] = '';
+	if (!isset($context['javascript_files']))
+		$context['javascript_files'] = array();
+	if (!isset($context['css_files']))
+		$context['css_files'] = array();
+	if (!isset($context['javascript_inline']))
+		$context['javascript_inline'] = array('standard' => array(), 'defer' => array());
+	if (!isset($context['javascript_vars']))
+		$context['javascript_vars'] = array();
 
 	$context['menu_separator'] = !empty($settings['use_image_buttons']) ? ' ' : ' | ';
 	$context['session_var'] = $_SESSION['session_var'];
@@ -1580,9 +1694,6 @@ function loadTheme($id_theme = 0, $initialize = true)
 		'spellcheck',
 	);
 
-	$context['javascript_files'] = array();
-	$context['css_files'] = array();
-
 	// Wireless mode?  Load up the wireless stuff.
 	if (WIRELESS)
 	{
@@ -1629,10 +1740,6 @@ function loadTheme($id_theme = 0, $initialize = true)
 	// Initialize the theme.
 	loadSubTemplate('init', 'ignore');
 
-	// Load the compatibility stylesheet if the theme hasn't been updated for 2.0 RC2 (yet).
-	if (isset($settings['theme_version']) && (version_compare($settings['theme_version'], '2.0 RC2', '<') || strpos($settings['theme_version'], '2.0 Beta') !== false))
-		loadTemplate(false, 'compat');
-
 	// Guests may still need a name.
 	if ($context['user']['is_guest'] && empty($context['user']['name']))
 		$context['user']['name'] = $txt['guest_title'];
@@ -1668,7 +1775,6 @@ function loadTheme($id_theme = 0, $initialize = true)
 	// Allow overriding the board wide time/number formats.
 	if (empty($user_settings['time_format']) && !empty($txt['time_format']))
 		$user_info['time_format'] = $txt['time_format'];
-	$txt['number_format'] = empty($txt['number_format']) ? empty($modSettings['number_format']) ? '' : $modSettings['number_format'] : $txt['number_format'];
 
 	if (isset($settings['use_default_images']) && $settings['use_default_images'] == 'always')
 	{
@@ -1686,16 +1792,44 @@ function loadTheme($id_theme = 0, $initialize = true)
 
 	$context['tabindex'] = 1;
 
-	// Fix font size with HTML 4.01, etc.
-	if (isset($settings['doctype']))
-		$context['browser']['needs_size_fix'] |= $settings['doctype'] == 'html' && isBrowser('ie6');
-
 	// Compatibility.
 	if (!isset($settings['theme_version']))
 		$modSettings['memberCount'] = $modSettings['totalMembers'];
 
 	// This allows us to change the way things look for the admin.
 	$context['admin_features'] = isset($modSettings['admin_features']) ? explode(',', $modSettings['admin_features']) : array('cd,cp,k,w,rg,ml,pm');
+
+	// Default JS variables for use in every theme
+	$context['javascript_vars'] = array(
+		'smf_theme_url' => '"' . $settings['theme_url'] . '"',
+		'smf_default_theme_url' => '"' . $settings['default_theme_url'] . '"',
+		'smf_images_url' => '"' . $settings['images_url'] . '"',
+		'smf_scripturl' => '"' . $scripturl . '"',
+		'smf_iso_case_folding' => $context['server']['iso_case_folding'] ? 'true' : 'false',
+		'smf_charset' => '"' . $context['character_set'] . '"',
+		'smf_session_id' => '"' . $context['session_id'] . '"',
+		'smf_session_var' => '"' . $context['session_var'] . '"',
+		'smf_member_id' => $context['user']['id'],
+		'ajax_notification_text' => JavaScriptEscape($txt['ajax_in_progress']),
+		'ajax_notification_cancel_text' => JavaScriptEscape($txt['modify_cancel']),
+		'help_popup_heading_text' => JavaScriptEscape($txt['help_popup']),
+	);
+
+	// Add the JQuery library to the list of files to load.
+	if (isset($modSettings['jquery_source']) && $modSettings['jquery_source'] == 'cdn')
+		loadJavascriptFile('https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js', array(), 'jquery');
+	elseif (isset($modSettings['jquery_source']) && $modSettings['jquery_source'] == 'local')
+		loadJavascriptFile('jquery-1.7.1.min.js', array('default_theme' => true, 'seed' => false), 'jquery');
+	// Auto loading? template_javascript() will take care of the local half of this.
+	else
+		loadJavascriptFile('https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js', array(), 'jquery');
+
+	// Queue our JQuery plugins!
+	loadJavascriptFile('smf_jquery_plugins.js', array('default_theme' => true));
+
+	// script.js and theme.js, always required, so always add them! Makes index.template.php cleaner and all.
+	loadJavascriptFile('script.js', array('default_theme' => true), 'smf_scripts');
+	loadJavascriptFile('theme.js', array(), 'theme_scripts');
 
 	// If we think we have mail to send, let's offer up some possibilities... robots get pain (Now with scheduled task support!)
 	if ((!empty($modSettings['mail_next_send']) && $modSettings['mail_next_send'] < time() && empty($modSettings['mail_queue_use_cron'])) || empty($modSettings['next_task_time']) || $modSettings['next_task_time'] < time())
@@ -1716,15 +1850,14 @@ function loadTheme($id_theme = 0, $initialize = true)
 			$type = empty($modSettings['next_task_time']) || $modSettings['next_task_time'] < time() ? 'task' : 'mailq';
 			$ts = $type == 'mailq' ? $modSettings['mail_next_send'] : $modSettings['next_task_time'];
 
-			$context['html_headers'] .= '
-	<script type="text/javascript">
+			addInlineJavascript('
 		function smfAutoTask()
 		{
 			var tempImage = new Image();
 			tempImage.src = smf_scripturl + "?scheduled=' . $type . ';ts=' . $ts . '";
 		}
-		window.setTimeout("smfAutoTask();", 1);
-	</script>';
+		window.setTimeout("smfAutoTask();", 1);');
+
 		}
 	}
 
@@ -1757,7 +1890,7 @@ function loadTheme($id_theme = 0, $initialize = true)
  * @param string $template_name
  * @param array $style_sheets = array()
  * @param bool $fatal = true if fatal is true, dies with an error message if the template cannot be found
- * @return bool
+ * @return boolean
  */
 function loadTemplate($template_name, $style_sheets = array(), $fatal = true)
 {
@@ -1770,19 +1903,7 @@ function loadTemplate($template_name, $style_sheets = array(), $fatal = true)
 			$style_sheets = array($style_sheets);
 
 		foreach ($style_sheets as $sheet)
-		{
-			// Prevent the style sheet from being included twice.
-			if (strpos($context['html_headers'], 'id="' . $sheet . '_css"') !== false)
-				continue;
-
-			$sheet_path = file_exists($settings['theme_dir']. '/css/' . $sheet . '.css') ? 'theme_url' : (file_exists($settings['default_theme_dir']. '/css/' . $sheet . '.css') ? 'default_theme_url' : '');
-			if ($sheet_path)
-			{
-				$context['html_headers'] .= "\n\t" . '<link rel="stylesheet" type="text/css" id="' . $sheet . '_css" href="' . $settings[$sheet_path] . '/css/' . $sheet . '.css?alp21" />';
-				if ($db_show_debug === true)
-					$context['debug']['sheets'][] = $sheet . ' (' . basename($settings[$sheet_path]) . ')';
-			}
-		}
+			loadCSSFile($sheet . '.css', array(), $sheet);
 	}
 
 	// No template to load?
@@ -1854,7 +1975,7 @@ function loadTemplate($template_name, $style_sheets = array(), $fatal = true)
  */
 function loadSubTemplate($sub_template_name, $fatal = false)
 {
-	global $context, $settings, $options, $txt, $db_show_debug;
+	global $context, $txt, $db_show_debug;
 
 	if ($db_show_debug === true)
 		$context['debug']['sub_templates'][] = $sub_template_name;
@@ -1880,37 +2001,128 @@ function loadSubTemplate($sub_template_name, $fatal = false)
  * Add a CSS file for output later
  *
  * @param string $filename
- * @param array $options
+ * @param array $params
+ * Keys are the following:
+ * 	- ['local'] (true/false): define if the file is local
+ * 	- ['default_theme'] (true/false): force use of default theme url
+ * 	- ['force_current'] (true/false): if this is false, we will attempt to load the file from the default theme if not found in the current theme
+ *  - ['validate'] (true/false): if true script will validate the local file exists
+ *  - ['seed'] (true/false/string): if true or null, use cache stale, false do not, or used a supplied string
+ * @param string $id
  */
-function loadCSSFile($filename, $options = array())
+function loadCSSFile($filename, $params = array(), $id = '')
 {
 	global $settings, $context;
 
-	if (strpos($filename, 'http://') === false || !empty($options['local']))
-		$filename = $settings['theme_url'] . '/' . $filename;
+	$params['seed'] = (!isset($params['seed']) || $params['seed'] === true) ? '?alph21' : (is_string($params['seed']) ? ($params['seed'] = $params['seed'][0] === '?' ? $params['seed'] : '?' . $params['seed']) : '');
+	$params['force_current'] = !empty($params['force_current']) ? $params['force_current'] : false;
+	$theme = !empty($params['default_theme']) ? 'default_theme' : 'theme';
 
-	$context['css_files'][$filename] = $options;
+	// account for shorthand like admin.css?alp21 filenames
+	$has_seed = strpos($filename, '.css?');
+	$id = empty($id) ? strtr(basename($filename), '?', '_') : $id;
+
+	// Is this a local file?
+	if (strpos($filename, 'http') === false || !empty($params['local']))
+	{
+		// Are we validating the the file exists?
+		if (!empty($params['validate']) && !file_exists($settings[$theme . '_dir'] . '/css/' . $filename))
+		{
+			// Maybe the default theme has it?
+			if ($theme === 'theme' && !$params['force_current'] && file_exists($settings['default_theme_dir'] . '/' . $filename))
+				$filename = $settings['default_theme_url'] . '/css/' . $filename . ($has_seed ? '' : $params['seed']);
+			else
+				$filename = false;
+		}
+		else
+			$filename = $settings[$theme . '_url'] . '/css/' . $filename . ($has_seed ? '' : $params['seed']);
+	}
+
+	// Add it to the array for use in the template
+	if (!empty($filename))
+		$context['css_files'][$id] = array('filename' => $filename, 'options' => $params);
 }
 
 /**
  * Add a Javascript file for output later
- *
+
  * @param string $filename
- * @param array $options, possible parameters:
- * 	- local (true/false): define if the file is local
- * 	- default_theme (true/false): force use of default theme url
- * 	- defer (true/false): define if the file should be load in head or before the closing <html> tag
+ * @param array $params
+ * Keys are the following:
+ * 	- ['local'] (true/false): define if the file is local
+ * 	- ['default_theme'] (true/false): force use of default theme url
+ * 	- ['defer'] (true/false): define if the file should load in <head> or before the closing <html> tag
+ * 	- ['force_current'] (true/false): if this is false, we will attempt to load the file from the
+ *    default theme if not found in the current theme
+ *	- ['async'] (true/false): if the script should be loaded asynchronously (HTML5)
+ *  - ['validate'] (true/false): if true script will validate the local file exists
+ *  - ['seed'] (true/false/string): if true or null, use cache stale, false do not, or used a supplied string
+ *
+ * @param string $id
  */
-function loadJavascriptFile($filename, $options = array())
+function loadJavascriptFile($filename, $params = array(), $id = '')
 {
 	global $settings, $context;
 
-	$theme = !empty($options['default_theme']) ? 'default_theme_url' : 'theme_url';
+	$params['seed'] = (!isset($params['seed']) || $params['seed'] === true) ? '?alph21' : (is_string($params['seed']) ? ($params['seed'] = $params['seed'][0] === '?' ? $params['seed'] : '?' . $params['seed']) : '');
+	$params['force_current'] = !empty($params['force_current']) ? $params['force_current'] : false;
+	$theme = !empty($params['default_theme']) ? 'default_theme' : 'theme';
 
-	if (strpos($filename, 'http') === false || !empty($options['local']))
-		$filename = $settings[$theme] . '/' . $filename;
+	// account for shorthand like admin.js?alp21 filenames
+	$has_seed = strpos($filename, '.js?');
+	$id = empty($id) ? strtr(basename($filename), '?', '_') : $id;
 
-	$context['javascript_files'][$filename] = $options;
+	// Is this a local file?
+	if (strpos($filename, 'http') === false || !empty($params['local']))
+	{
+		// Are we validating it exists on disk?
+		if (!empty($params['validate']) && !file_exists($settings[$theme . '_dir'] . '/scripts/' . $filename))
+		{
+			// can't find it in this theme, how about the default?
+			if ($theme === 'theme' && !$params['force_current'] && file_exists($settings['default_theme_dir'] . '/' . $filename))
+				$filename = $settings['default_theme_url'] . '/scripts/' . $filename . ($has_seed ? '' : $params['seed']);
+			else
+				$filename = false;
+		}
+		else
+			$filename = $settings[$theme . '_url'] . '/scripts/' . $filename . ($has_seed ? '' : $params['seed']);
+	}
+
+	// Add it to the array for use in the template
+	if (!empty($filename))
+		$context['javascript_files'][$id] = array('filename' => $filename, 'options' => $params);
+}
+
+/**
+ * Add a Javascript variable for output later (for feeding text strings and similar to JS)
+ * Cleaner and easier (for modders) than to use the function below.
+ *
+ * @param string $key
+ * @param string $value
+ * @param bool $escape = false, whether or not to escape the value
+ */
+function addJavascriptVar($key, $value, $escape = false)
+{
+	global $context;
+
+	if (!empty($key) && !empty($value))
+		$context['javascript_vars'][$key] = !empty($escape) ? JavaScriptEscape($value) : $value;
+}
+
+/**
+ * Add a block of inline Javascript code to be executed later
+ *
+ * - only use this if you have to, generally external JS files are better, but for very small scripts
+ *   or for scripts that require help from PHP/whatever, this can be useful.
+ * - all code added with this function is added to the same <script> tag so do make sure your JS is clean!
+ *
+ * @param string $javascript
+ * @param bool $defer = false, define if the script should load in <head> or before the closing <html> tag
+ */
+function addInlineJavascript($javascript, $defer = false)
+{
+	global $context;
+	$context['javascript_inline'][($defer === true ? 'defer' : 'standard')][] = $javascript;
 }
 
 /**
@@ -1925,7 +2137,7 @@ function loadJavascriptFile($filename, $options = array())
 function loadLanguage($template_name, $lang = '', $fatal = true, $force_reload = false)
 {
 	global $user_info, $language, $settings, $context, $modSettings;
-	global $cachedir, $db_show_debug, $sourcedir, $txt;
+	global $db_show_debug, $sourcedir, $txt;
 	static $already_loaded = array();
 
 	// Default to the user's language.
@@ -2058,10 +2270,12 @@ function getBoardParents($id_parent)
 			$result = $smcFunc['db_query']('', '
 				SELECT
 					b.id_parent, b.name, {int:board_parent} AS id_board, IFNULL(mem.id_member, 0) AS id_moderator,
-					mem.real_name, b.child_level
+					mem.real_name, b.child_level, IFNULL(mg.id_group, 0) AS id_moderator_group, mg.group_name
 				FROM {db_prefix}boards AS b
 					LEFT JOIN {db_prefix}moderators AS mods ON (mods.id_board = b.id_board)
 					LEFT JOIN {db_prefix}members AS mem ON (mem.id_member = mods.id_member)
+					LEFT JOIN {db_prefix}moderator_groups AS modgs ON (modgs.id_board = b.id_board)
+					LEFT JOIN {db_prefix}membergroups AS mg ON (mg.id_group = modgs.id_group)
 				WHERE b.id_board = {int:board_parent}',
 				array(
 					'board_parent' => $id_parent,
@@ -2079,7 +2293,8 @@ function getBoardParents($id_parent)
 						'url' => $scripturl . '?board=' . $row['id_board'] . '.0',
 						'name' => $row['name'],
 						'level' => $row['child_level'],
-						'moderators' => array()
+						'moderators' => array(),
+						'moderator_groups' => array()
 					);
 				}
 				// If a moderator exists for this board, add that moderator for all children too.
@@ -2092,6 +2307,18 @@ function getBoardParents($id_parent)
 							'href' => $scripturl . '?action=profile;u=' . $row['id_moderator'],
 							'link' => '<a href="' . $scripturl . '?action=profile;u=' . $row['id_moderator'] . '">' . $row['real_name'] . '</a>'
 						);
+					}
+				
+				// If a moderator group exists for this board, add that moderator group for all children too
+				if (!empty($row['id_moderator_group']))
+					foreach ($boards as $id => $dummy)
+					{
+						$boards[$id]['moderator_groups'][$row['id_moderator_group']] = array(
+							'id' => $row['id_moderator_group'],
+							'name' => $row['group_name'],
+							'href' => $scripturl . '?action=groups;sa=members;group=' . $row['id_moderator_group'],
+							'link' => '<a href="' . $scripturl . '?action=groups;sa=members;group=' . $row['id_moderator_group'] . '">' . $row['group_name'] . '</a>'
+						);					
 					}
 			}
 			$smcFunc['db_free_result']($result);
@@ -2237,8 +2464,8 @@ function censorText(&$text, $force = false)
  */
 function template_include($filename, $once = false)
 {
-	global $context, $settings, $options, $txt, $scripturl, $modSettings;
-	global $user_info, $boardurl, $boarddir, $sourcedir;
+	global $context, $settings, $txt, $scripturl, $modSettings;
+	global $boardurl, $boarddir, $sourcedir;
 	global $maintenance, $mtitle, $mmessage;
 	static $templates = array();
 
@@ -2348,9 +2575,7 @@ function template_include($filename, $once = false)
 				$data2 = preg_split('~\<br( /)?\>~', $data2);
 
 				// Fix the PHP code stuff...
-				if (isBrowser('ie4') || isBrowser('ie5') || isBrowser('ie5.5'))
-					$data2 = str_replace("\t", '<pre style="display: inline;">' . "\t" . '</pre>', $data2);
-				elseif (!isBrowser('gecko'))
+				if (!isBrowser('gecko'))
 					$data2 = str_replace("\t", '<span style="white-space: pre;">' . "\t" . '</span>', $data2);
 				else
 					$data2 = str_replace('<pre style="display: inline;">' . "\t" . '</pre>', "\t", $data2);
@@ -2508,7 +2733,7 @@ function cache_quick_get($key, $file, $function, $params, $level = 1)
  * Puts value in the cache under key for ttl seconds.
  *
  * - It may "miss" so shouldn't be depended on
- * - Uses the cahce engine chosen in the ACP and saved in settings.php
+ * - Uses the cache engine chosen in the ACP and saved in settings.php
  * - It supports:
  *     Turck MMCache: http://turck-mmcache.sourceforge.net/index_old.html#api
  *     Xcache: http://xcache.lighttpd.net/wiki/XcacheApi
@@ -2725,7 +2950,7 @@ function cache_get_data($key, $ttl = 120)
 		$cache_hits[$cache_count]['s'] = isset($value) ? strlen($value) : 0;
 	}
 
-	if (function_exists('call_integration_hook'))
+	if (function_exists('call_integration_hook') && isset($value))
 		call_integration_hook('cache_get_data', array(&$key, &$ttl, &$value));
 
 	return empty($value) ? null : @unserialize($value);
@@ -2742,7 +2967,7 @@ function cache_get_data($key, $ttl = 120)
  */
 function get_memcached_server($level = 3)
 {
-	global $modSettings, $memcached, $db_persist, $cache_memcached;
+	global $memcached, $db_persist, $cache_memcached;
 
 	$servers = explode(',', $cache_memcached);
 	$server = explode(':', trim($servers[array_rand($servers)]));

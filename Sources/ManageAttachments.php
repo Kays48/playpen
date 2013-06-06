@@ -8,14 +8,14 @@
  *
  * @package SMF
  * @author Simple Machines http://www.simplemachines.org
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
  */
 
 if (!defined('SMF'))
-	die('Hacking attempt...');
+	die('No direct access...');
 
 /**
  * The main 'Attachments and Avatars' management function.
@@ -89,7 +89,7 @@ function ManageAttachmentSettings($return_config = false)
 {
 	global $txt, $modSettings, $scripturl, $context, $options, $sourcedir, $boarddir;
 
-	require_once($sourcedir . '/Attachments.php');
+	require_once($sourcedir . '/Subs-Attachments.php');
 
 	// Get the current attachment directory.
 	$modSettings['attachmentUploadDir'] = unserialize($modSettings['attachmentUploadDir']);
@@ -102,7 +102,7 @@ function ManageAttachmentSettings($return_config = false)
 	// If not set, show a default path for the base directory
 	if (!isset($_GET['save']) && empty($modSettings['basedirectory_for_attachments']))
 		if (is_dir($modSettings['attachmentUploadDir'][1]))
-			$modSettings['basedirectory_for_attachments'] = $modSettings['attachmentUploadDir'][1];		
+			$modSettings['basedirectory_for_attachments'] = $modSettings['attachmentUploadDir'][1];
 		else
 			$modSettings['basedirectory_for_attachments'] = $context['attachmentUploadDir'];
 
@@ -214,7 +214,7 @@ function ManageAttachmentSettings($return_config = false)
 
 		if (!empty($_POST['use_subdirectories_for_attachments']))
 		{
-			if(isset($_POST['use_subdirectories_for_attachments']) && empty($_POST['basedirectory_for_attachments']))
+			if (isset($_POST['use_subdirectories_for_attachments']) && empty($_POST['basedirectory_for_attachments']))
 				$_POST['basedirectory_for_attachments'] = (!empty($modSettings['basedirectory_for_attachments']) ? ($modSettings['basedirectory_for_attachments']) : $boarddir);
 
 			if (!empty($_POST['use_subdirectories_for_attachments']) && !empty($modSettings['attachment_basedirectories']))
@@ -244,7 +244,7 @@ function ManageAttachmentSettings($return_config = false)
 					));
 
 					$_POST['use_subdirectories_for_attachments'] = 1;
-					$_POST['attachmentUploadDir'] = serialize($modSettings['attachmentUploadDir']);	
+					$_POST['attachmentUploadDir'] = serialize($modSettings['attachmentUploadDir']);
 
 				}
 			}
@@ -324,9 +324,7 @@ function ManageAvatarSettings($return_config = false)
 	if ($return_config)
 		return $config_vars;
 
-	// We need these files for the inline permission settings, and the settings template.
-	// @todo is this really needed?
-	require_once($sourcedir . '/ManagePermissions.php');
+	// We need this file for the settings template.
 	require_once($sourcedir . '/ManageServer.php');
 
 	// Saving avatar settings?
@@ -381,7 +379,7 @@ function BrowseFiles()
 	// Set the options for the list component.
 	$listOptions = array(
 		'id' => 'file_list',
-		'title' => $txt['attachment_manager_' . ($context['browse_type'] === 'avatars' ? 'avatars' : ( $context['browse_type'] === 'thumbs' ? 'thumbs' : 'attachments'))],
+		'title' => $txt['attachment_manager_' . ($context['browse_type'] === 'avatars' ? 'avatars' : ($context['browse_type'] === 'thumbs' ? 'thumbs' : 'attachments'))],
 		'items_per_page' => $modSettings['defaultMaxMessages'],
 		'base_href' => $scripturl . '?action=admin;area=manageattachments;sa=browse' . ($context['browse_type'] === 'avatars' ? ';avatars' : ($context['browse_type'] === 'thumbs' ? ';thumbs' : '')),
 		'default_sort_col' => 'name',
@@ -507,11 +505,8 @@ function BrowseFiles()
 					'value' => $txt['downloads'],
 				),
 				'data' => array(
-					'function' => create_function('$rowData','
-						global $txt;
-
-						return comma_format($rowData[\'downloads\']);
-					'),
+					'db' => 'downloads',
+					'comma_format' => true,
 				),
 				'sort' => array(
 					'default' => 'a.downloads',
@@ -521,6 +516,7 @@ function BrowseFiles()
 			'check' => array(
 				'header' => array(
 					'value' => '<input type="checkbox" onclick="invertAll(this, this.form);" class="input_check" />',
+					'class' => 'centercol',
 				),
 				'data' => array(
 					'sprintf' => array(
@@ -529,7 +525,7 @@ function BrowseFiles()
 							'id_attach' => false,
 						),
 					),
-					'style' => 'text-align: center',
+					'class' => 'centercol',
 				),
 			),
 		),
@@ -545,7 +541,6 @@ function BrowseFiles()
 			array(
 				'position' => 'below_table_data',
 				'value' => '<input type="submit" name="remove_submit" class="button_submit" value="' . $txt['quickmod_delete_selected'] . '" onclick="return confirm(\'' . $txt['confirm_delete_attachments'] . '\');" />',
-				'style' => 'text-align: right;',
 			),
 		),
 	);
@@ -562,7 +557,7 @@ function BrowseFiles()
  * @param int $start
  * @param int $items_per_page
  * @param string $sort
- * @param string $browse_type, can be 'avatars' or ... not. :P
+ * @param string $browse_type can be one of 'avatars' or ... not. :P
  */
 function list_getFiles($start, $items_per_page, $sort, $browse_type)
 {
@@ -621,8 +616,7 @@ function list_getFiles($start, $items_per_page, $sort, $browse_type)
  * Return the number of files of the specified type recorded in the database.
  * (the specified type being attachments or avatars).
  *
- * @param string $browse_type, can be 'avatars' or not. (in which case they're
- * attachments)
+ * @param string $browse_type can be one of 'avatars' or not. (in which case they're attachments)
  */
 function list_getNumFiles($browse_type)
 {
@@ -717,6 +711,8 @@ function MaintainFiles()
 	);
 	list ($attachmentDirSize) = $smcFunc['db_fetch_row']($request);
 	$smcFunc['db_free_result']($request);
+
+	// Divide it into kilobytes.
 	$attachmentDirSize /= 1024;
 	$context['attachment_total_size'] = comma_format($attachmentDirSize, 2);
 
@@ -734,6 +730,7 @@ function MaintainFiles()
 	$smcFunc['db_free_result']($request);
 	$current_dir_size /= 1024;
 
+	// If they specified a limit only....
 	if (!empty($modSettings['attachmentDirSizeLimit']))
 		$context['attachment_space'] = comma_format(max($modSettings['attachmentDirSizeLimit'] - $current_dir_size, 0), 2);
 	$context['attachment_current_size'] = comma_format($current_dir_size, 2);
@@ -741,7 +738,7 @@ function MaintainFiles()
 	if (!empty($modSettings['attachmentDirFileLimit']))
 		$context['attachment_files'] = comma_format(max($modSettings['attachmentDirFileLimit'] - $current_dir_files, 0), 0);
 	$context['attachment_current_files'] = comma_format($current_dir_files, 0);
-	
+
 	$context['attach_multiple_dirs'] = count($attach_dirs) > 1 ? true : false;
 	$context['attach_dirs'] = $attach_dirs;
 	$context['base_dirs'] = !empty($modSettings['attachment_basedirectories']) ? unserialize($modSettings['attachment_basedirectories']) : array();
@@ -1135,7 +1132,7 @@ function RepairAttachments()
 	@set_time_limit(600);
 
 	$_GET['step'] = empty($_GET['step']) ? 0 : (int) $_GET['step'];
-	$_GET['substep'] = empty($_GET['substep']) ? 0 : (int) $_GET['substep'];
+	$context['starting_substep'] = $_GET['substep'] = empty($_GET['substep']) ? 0 : (int) $_GET['substep'];
 
 	// Don't recall the session just in case.
 	if ($_GET['step'] == 0 && $_GET['substep'] == 0)
@@ -1631,7 +1628,7 @@ function RepairAttachments()
 								);
 								if ($smcFunc['db_num_rows']($request) == 0)
 								{
-									if ($fix_errors)
+									if ($fix_errors && in_array('files_without_attachment', $to_fix))
 									{
 										@unlink($attach_dir . '/' . $file);
 									}
@@ -1644,8 +1641,21 @@ function RepairAttachments()
 								$smcFunc['db_free_result']($request);
 							}
 						}
+						elseif ($file != 'index.php')
+						{
+							if ($fix_errors && in_array('files_without_attachment', $to_fix))
+							{
+								@unlink($attach_dir . '/' . $file);
+							}
+							else
+							{
+								$context['repair_errors']['files_without_attachment']++;
+								$to_fix[] = 'files_without_attachment';
+							}
+						}
 					}
 					$current_check++;
+					$_GET['substep'] = $current_check;
 					if ($current_check - $files_checked >= $max_checks)
 						pauseAttachmentMaintenance($to_fix);
 				}
@@ -1687,7 +1697,7 @@ function pauseAttachmentMaintenance($to_fix, $max_substep = 0)
 		@apache_reset_timeout();
 
 	// Have we already used our maximum time?
-	if (time() - array_sum(explode(' ', $time_start)) < 3)
+	if (time() - array_sum(explode(' ', $time_start)) < 3 || $context['starting_substep'] == $_GET['substep'])
 		return;
 
 	$context['continue_get_data'] = '?action=admin;area=manageattachments;sa=repair' . (isset($_GET['fixErrors']) ? ';fixErrors' : '') . ';step=' . $_GET['step'] . ';substep=' . $_GET['substep'] . ';' . $context['session_var'] . '=' . $context['session_id'];
@@ -1929,7 +1939,7 @@ function ManageAttachmentPaths()
 				}
 
 				// OK, so let's try to create it then.
-				require_once($sourcedir . '/Attachments.php');
+				require_once($sourcedir . '/Subs-Attachments.php');
 				if (automanage_attachments_create_directory($path))
 					$_POST['current_dir'] = $modSettings['currentAttachmentUploadDir'];
 				else
@@ -1971,7 +1981,7 @@ function ManageAttachmentPaths()
 			{
 				$path = $modSettings['attachmentUploadDir'][$id];
 
-				// It's not a good idea to delete the current directory. 
+				// It's not a good idea to delete the current directory.
 				if ($id == (!empty($_POST['current_dir']) ? $_POST['current_dir'] : $modSettings['currentAttachmentUploadDir']))
 					$errors[] = $path . ': ' . $txt['attach_dir_is_current'];
 				// Or the current base directory
@@ -2060,14 +2070,14 @@ function ManageAttachmentPaths()
 			if (!is_array($modSettings['last_attachments_directory']))
 				$modSettings['last_attachments_directory'] = unserialize($modSettings['last_attachments_directory']);
 			$num = substr(strrchr($modSettings['attachmentUploadDir'][$_POST['current_dir']], '_'), 1);
-			
+
 			if (is_numeric($num))
 			{
 				// Need to find the base folder.
 				$bid = -1;
 				$use_subdirectories_for_attachments = 0;
 				if (!empty($modSettings['attachment_basedirectories']))
-					foreach($modSettings['attachment_basedirectories'] as $bid => $base)
+					foreach ($modSettings['attachment_basedirectories'] as $bid => $base)
 						if (strpos($modSettings['attachmentUploadDir'][$_POST['current_dir']], $base . DIRECTORY_SEPARATOR) !==false)
 						{
 							$use_subdirectories_for_attachments = 1;
@@ -2148,7 +2158,7 @@ function ManageAttachmentPaths()
 
 		If (isset($_POST['base_dir']))
 		{
-			foreach($_POST['base_dir'] as $id => $dir)
+			foreach ($_POST['base_dir'] as $id => $dir)
 			{
 				if (!empty($dir) && $dir != $modSettings['attachmentUploadDir'][$id])
 				{
@@ -2184,7 +2194,7 @@ function ManageAttachmentPaths()
 		// Or adding a new one?
 		if (!empty($_POST['new_base_dir']))
 		{
-			require_once($sourcedir . '/Attachments.php');
+			require_once($sourcedir . '/Subs-Attachments.php');
 			$_POST['new_base_dir'] = htmlspecialchars($_POST['new_base_dir'], ENT_QUOTES);
 
 			$current_dir = $modSettings['currentAttachmentUploadDir'];
@@ -2222,11 +2232,11 @@ function ManageAttachmentPaths()
 		{
 			$errors = array();
 			if (!empty($_SESSION['errors']['dir']))
-				foreach($_SESSION['errors']['dir'] as $error)
+				foreach ($_SESSION['errors']['dir'] as $error)
 					$errors['dir'][] = $smcFunc['htmlspecialchars']($error, ENT_QUOTES);
-			
+
 			if (!empty($_SESSION['errors']['base']))
-				foreach($_SESSION['errors']['base'] as $error)
+				foreach ($_SESSION['errors']['base'] as $error)
 					$errors['base'][] = $smcFunc['htmlspecialchars']($error, ENT_QUOTES);
 		}
 		unset($_SESSION['errors']);
@@ -2243,12 +2253,14 @@ function ManageAttachmentPaths()
 			'current_dir' => array(
 				'header' => array(
 					'value' => $txt['attach_current'],
+					'class' => 'centercol',
 				),
 				'data' => array(
 					'function' => create_function('$rowData', '
 						return \'<input type="radio" name="current_dir" value="\' . $rowData[\'id\'] . \'" \' . ($rowData[\'current\'] ? \' checked="checked"\' : \'\') . (!empty($rowData[\'disable_current\']) ? \' disabled="disabled"\' : \'\') . \' class="input_radio" />\';
 					'),
-					'style' => 'text-align: center; width: 10%;',
+					'style' => 'width: 10%;',
+					'class' => 'centercol',
 				),
 			),
 			'path' => array(
@@ -2259,7 +2271,7 @@ function ManageAttachmentPaths()
 					'function' => create_function('$rowData', '
 						return \'<input type="hidden" name="dirs[\' . $rowData[\'id\'] . \']" value="\' . $rowData[\'path\'] . \'" /><input type="text" size="40" name="dirs[\' . $rowData[\'id\'] . \']" value="\' . $rowData[\'path\'] . \'"\' . (!empty($rowData[\'disable_base_dir\']) ? \' disabled="disabled"\' : \'\') . \' class="input_text" style="width: 100%" />\';
 					'),
-					'style' => 'text-align: center; width: 40%;',
+					'style' => 'width: 40%;',
 				),
 			),
 			'current_size' => array(
@@ -2268,7 +2280,7 @@ function ManageAttachmentPaths()
 				),
 				'data' => array(
 					'db' => 'current_size',
-					'style' => 'text-align: center; width: 15%;',
+					'style' => 'width: 15%;',
 				),
 			),
 			'num_files' => array(
@@ -2277,16 +2289,18 @@ function ManageAttachmentPaths()
 				),
 				'data' => array(
 					'db' => 'num_files',
-					'style' => 'text-align: center; width: 15%;',
+					'style' => 'width: 15%;',
 				),
 			),
 			'status' => array(
 				'header' => array(
 					'value' => $txt['attach_dir_status'],
+					'class' => 'centercol',
 				),
 				'data' => array(
 					'db' => 'status',
-					'style' => 'text-align: center; width: 25%;',
+					'style' => 'width: 25%;',
+					'class' => 'centercol',
 				),
 			),
 		),
@@ -2296,18 +2310,20 @@ function ManageAttachmentPaths()
 		'additional_rows' => array(
 			array(
 				'position' => 'below_table_data',
-				'value' => '<input type="hidden" name="' . $context['session_var'] . '" value="' . $context['session_id'] . '" /><input type="submit" name="new_path" value="' . $txt['attach_add_path'] . '" class="button_submit" />&nbsp;<input type="submit" name="save" value="' . $txt['save'] . '" class="button_submit" />',
-				'style' => 'text-align: right;',
+				'value' => '
+				<input type="hidden" name="' . $context['session_var'] . '" value="' . $context['session_id'] . '" />
+				<input type="submit" name="save" value="' . $txt['save'] . '" class="button_submit" />
+				<input type="submit" name="new_path" value="' . $txt['attach_add_path'] . '" class="button_submit" />',
 			),
 			empty($errors['dir']) ? array(
 				'position' => 'top_of_list',
 				'value' => $txt['attach_dir_desc'],
-				'style' => 'text-align: left; padding: 5px 10px',
+				'style' => 'padding: 5px 10px;',
 				'class' => 'windowbg2 smalltext'
 			) : array(
 				'position' => 'top_of_list',
 				'value' => $txt['attach_dir_save_problem'] . '<br />' . implode('<br />', $errors['dir']),
-				'style' => 'text-align: left;',
+				'style' => 'padding-left: 35px;',
 				'class' => 'noticebox',
 			),
 		),
@@ -2328,12 +2344,14 @@ function ManageAttachmentPaths()
 				'current_dir' => array(
 					'header' => array(
 						'value' => $txt['attach_current'],
+						'class' => 'centercol',
 					),
 					'data' => array(
 						'function' => create_function('$rowData', '
 							return \'<input type="radio" name="current_base_dir" value="\' . $rowData[\'id\'] . \'" \' . ($rowData[\'current\'] ? \' checked="checked"\' : \'\') . \' class="input_radio" />\';
 						'),
-						'style' => 'text-align: center; width: 10%;',
+						'style' => 'width: 10%;',
+						'class' => 'centercol',
 					),
 				),
 				'path' => array(
@@ -2351,7 +2369,7 @@ function ManageAttachmentPaths()
 					),
 					'data' => array(
 						'db' => 'num_dirs',
-						'style' => 'text-align: center; width: 15%;',
+						'style' => 'width: 15%;',
 					),
 				),
 				'status' => array(
@@ -2360,7 +2378,8 @@ function ManageAttachmentPaths()
 					),
 					'data' => array(
 						'db' => 'status',
-						'style' => 'text-align: center; width: 15%;',
+						'style' => 'width: 15%;',
+						'class' => 'centercol',
 					),
 				),
 			),
@@ -2370,18 +2389,18 @@ function ManageAttachmentPaths()
 			'additional_rows' => array(
 				array(
 					'position' => 'below_table_data',
-					'value' => '<input type="hidden" name="' . $context['session_var'] . '" value="' . $context['session_id'] . '" /><input type="submit" name="new_base_path" value="' . $txt['attach_add_path'] . '" class="button_submit" />&nbsp;<input type="submit" name="save2" value="' . $txt['save'] . '" class="button_submit" />',
-					'style' => 'text-align: right;',
+					'value' => '<input type="hidden" name="' . $context['session_var'] . '" value="' . $context['session_id'] . '" /><input type="submit" name="save2" value="' . $txt['save'] . '" class="button_submit" />
+					<input type="submit" name="new_base_path" value="' . $txt['attach_add_path'] . '" class="button_submit" />',
 				),
 				empty($errors['base']) ? array(
 					'position' => 'top_of_list',
 					'value' => $txt['attach_dir_base_desc'],
-					'style' => 'text-align: left; padding: 5px 10px',
+					'style' => 'padding: 5px 10px;',
 					'class' => 'windowbg2 smalltext'
 				) : array(
 					'position' => 'top_of_list',
 					'value' => $txt['attach_dir_save_problem'] . '<br />' . implode('<br />', $errors['base']),
-					'style' => 'text-align: left;',
+					'style' => 'padding-left: 35px',
 					'class' => 'noticebox',
 				),
 			),
@@ -2561,12 +2580,15 @@ function attachDirStatus($dir, $expected_files)
 		return array('ok', false, $num_files);
 }
 
+/**
+ * Maintance function to move attachments from one directory to another
+ */
 function TransferAttachments()
 {
 	global $modSettings, $context, $smcFunc, $sourcedir, $txt, $boarddir;
-	
+
 	checkSession();
-	
+
 	$modSettings['attachmentUploadDir'] = unserialize($modSettings['attachmentUploadDir']);
 	if (!empty($modSettings['attachment_basedirectories']))
 		$modSettings['attachment_basedirectories'] = unserialize($modSettings['attachment_basedirectories']);
@@ -2584,7 +2606,7 @@ function TransferAttachments()
 	$current_progress = 0;
 	$total_moved = 0;
 	$total_not_moved = 0;
-	
+
 	if (empty($_POST['from']) || (empty($_POST['auto']) && empty($_POST['to'])))
 		$results[] = $txt['attachment_transfer_no_dir'];
 
@@ -2617,7 +2639,7 @@ function TransferAttachments()
 		// Where are they going?
 		if (!empty($_POST['auto']))
 		{
-			require_once($sourcedir . '/Attachments.php');
+			require_once($sourcedir . '/Subs-Attachments.php');
 
 			$modSettings['automanage_attachments'] = 1;
 			$modSettings['use_subdirectories_for_attachments'] = $_POST['auto'] == -1 ? 0 : 1;
@@ -2760,9 +2782,9 @@ function TransferAttachments()
 						<div class="green_percent" style="width: ' . $percent_done . '%;">&nbsp;</div>
 					</div>';
 				// Write it to a file so it can be displayed
-				$fp = fopen($boarddir . '/progress.php', "w");        
-				fwrite($fp, $prog_bar);  
-				fclose($fp);  
+				$fp = fopen($boarddir . '/progress.php', "w");
+				fwrite($fp, $prog_bar);
+				fclose($fp);
 				usleep(500000);
 			}
 		}

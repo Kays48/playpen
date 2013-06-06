@@ -134,7 +134,10 @@ smf_ViewVersions.prototype.swapOption = function (oSendingElement, sName)
 {
 	// If it is undefined, or currently off, turn it on - otherwise off.
 	this.oSwaps[sName] = !(sName in this.oSwaps) || !this.oSwaps[sName];
-	document.getElementById(sName).style.display = this.oSwaps[sName] ? '' : 'none';
+	if (this.oSwaps[sName])
+		$("#" + sName).show(300);
+	else
+		$("#" + sName).hide(300);
 
 	// Unselect the link and return false.
 	oSendingElement.blur();
@@ -336,12 +339,13 @@ function addNewWord()
 
 function toggleBBCDisabled(section, disable)
 {
-	for (var i = 0; i < document.forms.bbcForm.length; i++)
+	elems = document.getElementById(section).getElementsByTagName('*');
+	for (var i = 0; i < elems.length; i++)
 	{
-		if (typeof(document.forms.bbcForm[i].name) == "undefined" || (document.forms.bbcForm[i].name.substr(0, 11) != "enabledTags") || (document.forms.bbcForm[i].name.indexOf(section) != 11))
+		if (typeof(elems[i].name) == "undefined" || (elems[i].name.substr((section.length + 1), (elems[i].name.length - 2 - (section.length + 1))) != "enabledTags") || (elems[i].name.indexOf(section) != 0))
 			continue;
 
-		document.forms.bbcForm[i].disabled = disable;
+		elems[i].disabled = disable;
 	}
 	document.getElementById("bbc_" + section + "_select_all").disabled = disable;
 }
@@ -477,12 +481,24 @@ function toggleBreakdown(id_group, forcedisplayType)
 	if (typeof(forcedisplayType) != "undefined")
 		displayType = forcedisplayType;
 
+	// swap the image
+	document.getElementById("group_toggle_img_" + id_group).src = smf_images_url + "/" + (displayType == "none" ? "selected" : "selected_open") + ".png";
+
+	// show or hide the elements
+	var aContainer = new Array();
 	for (i = 0; i < groupPermissions[id_group].length; i++)
 	{
-		document.getElementById("perm_div_" + id_group + "_" + groupPermissions[id_group][i]).style.display = displayType
+		var oContainerTemp = document.getElementById("perm_div_" + id_group + "_" + groupPermissions[id_group][i]);
+		if (typeof(oContainerTemp) == 'object' && oContainerTemp != null)
+			aContainer[i] = oContainerTemp;
 	}
+	if (displayType == "none")
+		$(aContainer).fadeOut();
+	else
+		$(aContainer).show();
+		
+	// remove or add the separators
 	document.getElementById("group_hr_div_" + id_group).style.display = displayType
-	document.getElementById("group_toggle_img_" + id_group).src = smf_images_url + "/" + (displayType == "none" ? "selected" : "selected_open") + ".png";
 
 	return false;
 }

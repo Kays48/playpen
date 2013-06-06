@@ -8,14 +8,14 @@
  *
  * @package SMF
  * @author Simple Machines http://www.simplemachines.org
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
  */
 
 if (!defined('SMF'))
-	die('Hacking attempt...');
+	die('No direct access...');
 
 /**
  * This function allows to move a topic, making sure to ask the moderator
@@ -296,7 +296,7 @@ function MoveTopic2()
 			$txt['movetopic_auto_board'] => '[url=' . $scripturl . '?board=' . $_POST['toboard'] . '.0]' . $board_name . '[/url]',
 			$txt['movetopic_auto_topic'] => '[iurl]' . $scripturl . '?topic=' . $topic . '.0[/iurl]'
 		));
-		
+
 		// auto remove this MOVED redirection topic in the future?
 		$redirect_expires = !empty($_POST['redirect_expires']) ? ((int) ($_POST['redirect_expires'] * 60) + time()) : 0;
 
@@ -384,7 +384,16 @@ function MoveTopic2()
 		redirectexit('topic=' . $topic . '.0');
 }
 
-// Moves one or more topics to a specific board. (doesn't check permissions.)
+/**
+ * Moves one or more topics to a specific board. (doesn't check permissions.)
+ * Determines the source boards for the supplied topics
+ * Handles the moving of mark_read data
+ * Updates the posts count of the affected boards
+ *
+ * @param type $topics
+ * @param type $toBoard
+ * @return type
+ */
 function moveTopics($topics, $toBoard)
 {
 	global $sourcedir, $user_info, $modSettings, $smcFunc;
@@ -392,7 +401,7 @@ function moveTopics($topics, $toBoard)
 	// Empty array?
 	if (empty($topics))
 		return;
-		
+
 	// Only a single topic.
 	if (is_numeric($topics))
 		$topics = array($topics);
@@ -447,7 +456,7 @@ function moveTopics($topics, $toBoard)
 	// Move over the mark_read data. (because it may be read and now not by some!)
 	$SaveAServer = max(0, $modSettings['maxMsgID'] - 50000);
 	$request = $smcFunc['db_query']('', '
-		SELECT lmr.id_member, lmr.id_msg, t.id_topic
+		SELECT lmr.id_member, lmr.id_msg, t.id_topic, lt.disregarded
 		FROM {db_prefix}topics AS t
 			INNER JOIN {db_prefix}log_mark_read AS lmr ON (lmr.id_board = t.id_board
 				AND lmr.id_msg > t.id_first_msg AND lmr.id_msg > {int:protect_lmr_msg})
@@ -462,14 +471,14 @@ function moveTopics($topics, $toBoard)
 	$log_topics = array();
 	while ($row = $smcFunc['db_fetch_assoc']($request))
 	{
-		$log_topics[] = array($row['id_topic'], $row['id_member'], $row['id_msg']);
+		$log_topics[] = array($row['id_topic'], $row['id_member'], $row['id_msg'], $row['disregarded']);
 
 		// Prevent queries from getting too big. Taking some steam off.
 		if (count($log_topics) > 500)
 		{
 			$smcFunc['db_insert']('replace',
 				'{db_prefix}log_topics',
-				array('id_topic' => 'int', 'id_member' => 'int', 'id_msg' => 'int'),
+				array('id_topic' => 'int', 'id_member' => 'int', 'id_msg' => 'int', 'disregarded' => 'int'),
 				$log_topics,
 				array('id_topic', 'id_member')
 			);
@@ -485,7 +494,7 @@ function moveTopics($topics, $toBoard)
 		// Insert that information into the database!
 		$smcFunc['db_insert']('replace',
 			'{db_prefix}log_topics',
-			array('id_topic' => 'int', 'id_member' => 'int', 'id_msg' => 'int'),
+			array('id_topic' => 'int', 'id_member' => 'int', 'id_msg' => 'int', 'disregarded' => 'int'),
 			$log_topics,
 			array('id_topic', 'id_member')
 		);
@@ -702,6 +711,10 @@ function moveTopics($topics, $toBoard)
 	));
 }
 
+/**
+ * Called after a topic is moved to update $board_link and $topic_link to point to new location
+ *
+ */
 function moveTopicConcurrence()
 {
 	global $board, $topic, $smcFunc, $scripturl;

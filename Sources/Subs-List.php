@@ -6,14 +6,14 @@
  *
  * @package SMF
  * @author Simple Machines http://www.simplemachines.org
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
  */
 
 if (!defined('SMF'))
-	die('Hacking attempt...');
+	die('No direct access...');
 
 /**
  * Create a new list
@@ -30,6 +30,8 @@ function createList($listOptions)
 	assert((empty($listOptions['items_per_page']) || (isset($listOptions['get_count']['function'], $listOptions['base_href']) && is_numeric($listOptions['items_per_page']))));
 	assert((empty($listOptions['default_sort_col']) || isset($listOptions['columns'][$listOptions['default_sort_col']])));
 	assert((!isset($listOptions['form']) || isset($listOptions['form']['href'])));
+
+	call_integration_hook('integrate_' . $listOptions['id'], array(&$listOptions));
 
 	// All the context data will be easily accessible by using a reference.
 	$context[$listOptions['id']] = array();
@@ -80,7 +82,8 @@ function createList($listOptions)
 		$list_context['items_per_page'] = $listOptions['items_per_page'];
 
 		// Then create a page index.
-		$list_context['page_index'] = constructPageIndex($listOptions['base_href'] . (empty($list_context['sort']) ? '' : ';' . $request_var_sort . '=' . $list_context['sort']['id'] . ($list_context['sort']['desc'] ? ';' . $request_var_desc : '')) . ($list_context['start_var_name'] != 'start' ? ';' . $list_context['start_var_name'] . '=%1$d' : ''), $list_context['start'], $list_context['total_num_items'], $list_context['items_per_page'], $list_context['start_var_name'] != 'start');
+		if ($list_context['total_num_items'] > $list_context['items_per_page'])
+			$list_context['page_index'] = constructPageIndex($listOptions['base_href'] . (empty($list_context['sort']) ? '' : ';' . $request_var_sort . '=' . $list_context['sort']['id'] . ($list_context['sort']['desc'] ? ';' . $request_var_desc : '')) . ($list_context['start_var_name'] != 'start' ? ';' . $list_context['start_var_name'] . '=%1$d' : ''), $list_context['start'], $list_context['total_num_items'], $list_context['items_per_page'], $list_context['start_var_name'] != 'start');
 	}
 
 	// Prepare the headers of the table.
@@ -106,6 +109,7 @@ function createList($listOptions)
 
 	// Call the function and include which items we want and in what order.
 	$list_items = call_user_func_array($listOptions['get_items']['function'], array_merge(array($list_context['start'], $list_context['items_per_page'], $sort), empty($listOptions['get_items']['params']) ? array() : $listOptions['get_items']['params']));
+	$list_items = empty($list_items) ? array() : $list_items;
 
 	// Loop through the list items to be shown and construct the data values.
 	$list_context['rows'] = array();
@@ -135,7 +139,7 @@ function createList($listOptions)
 
 			// The most flexible way probably is applying a custom function.
 			elseif (isset($column['data']['function']))
-				$cur_data['value'] = $column['data']['function']($list_item);
+				$cur_data['value'] = call_user_func_array($column['data']['function'], array($list_item));
 
 			// A modified value (inject the database values).
 			elseif (isset($column['data']['eval']))
@@ -167,8 +171,19 @@ function createList($listOptions)
 			$cur_row[$column_id] = $cur_data;
 		}
 
+		$list_context['rows'][$item_id]['class'] = '';
+		$list_context['rows'][$item_id]['style'] = '';
+		// Maybe we wat set a custom class for the row based on the data in the row itself
+		if (isset($listOptions['data_check']))
+		{
+			if (isset($listOptions['data_check']['class']))
+				$list_context['rows'][$item_id]['class'] = ' ' . $listOptions['data_check']['class']($list_item);
+			if (isset($listOptions['data_check']['style']))
+				$list_context['rows'][$item_id]['style'] = ' style="' . $listOptions['data_check']['style']($list_item) . '"';
+		}
+
 		// Insert the row into the list.
-		$list_context['rows'][$item_id] = $cur_row;
+		$list_context['rows'][$item_id]['data'] = $cur_row;
 	}
 
 	// The title is currently optional.

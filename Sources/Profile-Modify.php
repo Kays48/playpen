@@ -9,14 +9,14 @@
  *
  * @package SMF
  * @author Simple Machines http://www.simplemachines.org
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
  */
 
 if (!defined('SMF'))
-	die('Hacking attempt...');
+	die('No direct access...');
 
 /**
  * This defines every profile field known to man.
@@ -82,6 +82,9 @@ function loadProfileFields($force_reload = false)
 			'permission' => 'profile_extra',
 			'input_validate' => create_function('&$value', '
 				$value = strtr($value, \' \', \'+\');
+				if (strlen($value) > 32)
+					return \'aim_too_long\';
+
 				return true;
 			'),
 		),
@@ -366,22 +369,12 @@ function loadProfileFields($force_reload = false)
 				return false;
 			'),
 		),
-		'msn' => array(
+		'skype' => array(
 			'type' => 'text',
-			'label' => $txt['msn'],
-			'subtext' => $txt['msn_email_address'],
+			'label' => $txt['skype'],
+			'subtext' => $txt['skype_username'],
 			'size' => 24,
 			'permission' => 'profile_extra',
-			'input_validate' => create_function('&$value', '
-				global $cur_profile;
-				// Make sure the msn one is an email address, not something like \'none\' :P.
-				if ($value != \'\' && preg_match(\'~^[0-9A-Za-z=_+\-/][0-9A-Za-z=_\\\'+\-/\.]*@[\w\-]+(\.[\w\-]+)*(\.[\w]{2,6})$~\', $value) == 0)
-				{
-					$value = $cur_profile[\'msn\'];
-					return false;
-				}
-				return true;
-			'),
 		),
 		'passwrd1' => array(
 			'type' => 'password',
@@ -433,6 +426,14 @@ function loadProfileFields($force_reload = false)
 			'input_attr' => array('maxlength="50"'),
 			'size' => 50,
 			'permission' => 'profile_extra',
+			'input_validate' => create_function('&$value', '
+				global $smcFunc;
+
+				if ($smcFunc[\'strlen\']($value) > 50)
+					return \'personal_text_too_long\';
+
+				return true;
+			'),
 		),
 		// This does ALL the pm settings
 		'pm_prefs' => array(
@@ -512,7 +513,7 @@ function loadProfileFields($force_reload = false)
 			'label' => $txt['secret_answer'],
 			'subtext' => $txt['secret_desc2'],
 			'size' => 20,
-			'postinput' => '<span class="smalltext" style="margin-left: 4ex;">[<a href="' . $scripturl . '?action=helpadmin;help=secret_why_blank" onclick="return reqWin(this.href);">' . $txt['secret_why_blank'] . '</a>]</span>',
+			'postinput' => '<span class="smalltext" style="margin-left: 4ex;">[<a href="' . $scripturl . '?action=helpadmin;help=secret_why_blank" onclick="return reqOverlayDiv(this.href);">' . $txt['secret_why_blank'] . '</a>]</span>',
 			'value' => '',
 			'permission' => 'profile_identity',
 			'input_validate' => create_function('&$value', '
@@ -635,6 +636,14 @@ function loadProfileFields($force_reload = false)
 			'size' => 50,
 			'permission' => 'profile_title',
 			'enabled' => !empty($modSettings['titlesEnable']),
+			'input_validate' => create_function('&$value', '
+				global $smcFunc;
+
+				if ($smcFunc[\'strlen\']($value) > 50)
+					return \'user_title_too_long\';
+
+				return true;
+			'),
 		),
 		'website_title' => array(
 			'type' => 'text',
@@ -670,8 +679,8 @@ function loadProfileFields($force_reload = false)
 			'permission' => 'profile_extra',
 		),
 	);
-	
-	call_integration_hook('integrate_profile_fields', array(&$profile_fields));
+
+	call_integration_hook('integrate_load_profile_fields', array(&$profile_fields));
 
 	$disabled_fields = !empty($modSettings['disabled_profile_fields']) ? explode(',', $modSettings['disabled_profile_fields']) : array();
 	// For each of the above let's take out the bits which don't apply - to save memory and security!
@@ -1263,6 +1272,8 @@ function makeCustomFieldChanges($memID, $area, $sanitize = true)
 	}
 	$smcFunc['db_free_result']($request);
 
+	call_integration_hook('integrate_save_custom_profile_fields', array(&$changes, &$log_changes, $memID, $area, $sanitize));
+
 	// Make those changes!
 	if (!empty($changes) && empty($context['password_auth_failed']))
 	{
@@ -1275,8 +1286,7 @@ function makeCustomFieldChanges($memID, $area, $sanitize = true)
 		if (!empty($log_changes) && !empty($modSettings['modlog_enabled']))
 		{
 			require_once($sourcedir . '/Logging.php');
-			foreach ($log_changes as $log_change)
-				logAction($log_change['action'], $log_change['extra'], $log_change['log_type']);
+			logActions($log_changes);
 		}
 	}
 }
@@ -1309,7 +1319,7 @@ function editBuddyIgnoreLists($memID)
 	$context[$context['profile_menu_name']]['tab_data'] = array(
 		'title' => $txt['editBuddyIgnoreLists'],
 		'description' => $txt['buddy_ignore_desc'],
-		'icon' => 'profile_sm.png',
+		'icon' => 'profile_hd.png',
 		'tabs' => array(
 			'buddies' => array(),
 			'ignore' => array(),
@@ -1341,7 +1351,7 @@ function editBuddies($memID)
 	if (isset($_GET['remove']))
 	{
 		checkSession('get');
-		
+
 		call_integration_hook('integrate_remove_buddy', array($memID));
 
 		// Heh, I'm lazy, do it the easy way...
@@ -1372,7 +1382,7 @@ function editBuddies($memID)
 			if (strlen($new_buddies[$k]) == 0 || in_array($new_buddies[$k], array($user_profile[$memID]['member_name'], $user_profile[$memID]['real_name'])))
 				unset($new_buddies[$k]);
 		}
-		
+
 		call_integration_hook('integrate_add_buddies', array($memID, &$new_buddies));
 
 		if (!empty($new_buddies))
@@ -1436,7 +1446,7 @@ function editBuddies($memID)
 		loadMemberContext($buddy);
 		$context['buddies'][$buddy] = $memberContext[$buddy];
 	}
-	
+
 	call_integration_hook('integrate_view_buddies', array($memID));
 }
 
@@ -1586,7 +1596,7 @@ function account($memID)
  */
 function forumProfile($memID)
 {
-	global $context, $user_profile, $user_info, $txt, $modSettings;
+	global $context, $txt;
 
 	loadThemeOptions($memID);
 	if (allowedTo(array('profile_extra_own', 'profile_extra_any')))
@@ -1600,7 +1610,7 @@ function forumProfile($memID)
 		array(
 			'avatar_choice', 'hr', 'personal_text', 'hr',
 			'bday1', 'location', 'gender', 'hr',
-			'icq', 'aim', 'msn', 'yim', 'hr',
+			'icq', 'aim', 'yim', 'skype', 'hr',
 			'usertitle', 'signature', 'hr',
 			'karma_good', 'hr',
 			'website_title', 'website_url',
@@ -1876,6 +1886,7 @@ function notification($memID)
 				'header' => array(
 					'value' => '<input type="checkbox" class="input_check" onclick="invertAll(this, this.form);" />',
 					'style' => 'width: 4%;',
+					'class' => 'centercol',
 				),
 				'data' => array(
 					'sprintf' => array(
@@ -1884,7 +1895,7 @@ function notification($memID)
 							'id' => false,
 						),
 					),
-					'style' => 'text-align: center;',
+					'class' => 'centercol',
 				),
 			),
 		),
@@ -1993,6 +2004,7 @@ function notification($memID)
 				'header' => array(
 					'value' => '<input type="checkbox" class="input_check" onclick="invertAll(this, this.form);" />',
 					'style' => 'width: 4%;',
+					'class' => 'centercol',
 				),
 				'data' => array(
 					'sprintf' => array(
@@ -2001,7 +2013,7 @@ function notification($memID)
 							'id' => false,
 						),
 					),
-					'style' => 'text-align: center;',
+					'class' => 'centercol',
 				),
 			),
 		),
@@ -2312,7 +2324,7 @@ function ignoreboards($memID)
 
 /**
  * Load all the languages for the profile.
- * @return bool
+ * @return boolean
  */
 function profileLoadLanguages()
 {
@@ -2865,7 +2877,7 @@ function profileSaveAvatarData(&$value)
  * Validate the signature
  *
  * @param mixed &$value
- * @return bool|string
+ * @return boolean|string
  */
 function profileValidateSignature(&$value)
 {
@@ -2882,21 +2894,21 @@ function profileValidateSignature(&$value)
 		$disabledTags = !empty($sig_bbc) ? explode(',', $sig_bbc) : array();
 
 		$unparsed_signature = strtr(un_htmlspecialchars($value), array("\r" => '', '&#039' => '\''));
-		
+
 		// Too many lines?
 		if (!empty($sig_limits[2]) && substr_count($unparsed_signature, "\n") >= $sig_limits[2])
 		{
 			$txt['profile_error_signature_max_lines'] = sprintf($txt['profile_error_signature_max_lines'], $sig_limits[2]);
 			return 'signature_max_lines';
 		}
-		
+
 		// Too many images?!
 		if (!empty($sig_limits[3]) && (substr_count(strtolower($unparsed_signature), '[img') + substr_count(strtolower($unparsed_signature), '<img')) > $sig_limits[3])
 		{
 			$txt['profile_error_signature_max_image_count'] = sprintf($txt['profile_error_signature_max_image_count'], $sig_limits[3]);
 			return 'signature_max_image_count';
 		}
-		
+
 		// What about too many smileys!
 		$smiley_parsed = $unparsed_signature;
 		parsesmileys($smiley_parsed);
@@ -2908,7 +2920,7 @@ function profileValidateSignature(&$value)
 			$txt['profile_error_signature_max_smileys'] = sprintf($txt['profile_error_signature_max_smileys'], $sig_limits[4]);
 			return 'signature_max_smileys';
 		}
-		
+
 		// Maybe we are abusing font sizes?
 		if (!empty($sig_limits[7]) && preg_match_all('~\[size=([\d\.]+)?(px|pt|em|x-large|larger)~i', $unparsed_signature, $matches) !== false && isset($matches[2]))
 		{
@@ -2932,7 +2944,7 @@ function profileValidateSignature(&$value)
 				}
 			}
 		}
-		
+
 		// The difficult one - image sizes! Don't error on this - just fix it.
 		if ((!empty($sig_limits[5]) || !empty($sig_limits[6])))
 		{
@@ -3017,7 +3029,7 @@ function profileValidateSignature(&$value)
 					$value = str_replace(array_keys($replaces), array_values($replaces), $value);
 			}
 		}
-		
+
 		// Any disabled BBC?
 		$disabledSigBBC = implode('|', $disabledTags);
 		if (!empty($disabledSigBBC))
@@ -3032,7 +3044,7 @@ function profileValidateSignature(&$value)
 	}
 
 	preparsecode($value);
-	
+
 	// Too long?
 	if (!allowedTo('admin_forum') && !empty($sig_limits[1]) && $smcFunc['strlen'](str_replace('<br />', "\n", $value)) > $sig_limits[1])
 	{
@@ -3049,7 +3061,7 @@ function profileValidateSignature(&$value)
  *
  * @param string $email
  * @param int $memID = 0
- * @return bool|string
+ * @return boolean|string
  */
 function profileValidateEmail($email, $memID = 0)
 {
@@ -3075,7 +3087,7 @@ function profileValidateEmail($email, $memID = 0)
 			'email_address' => $email,
 		)
 	);
-	
+
 	if ($smcFunc['db_num_rows']($request) > 0)
 		return 'email_taken';
 	$smcFunc['db_free_result']($request);

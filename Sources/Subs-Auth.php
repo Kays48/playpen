@@ -7,23 +7,23 @@
  *
  * @package SMF
  * @author Simple Machines http://www.simplemachines.org
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
  */
 
 if (!defined('SMF'))
-	die('Hacking attempt...');
+	die('No direct access...');
 
 /**
- * sets the SMF-style login cookie and session based on the id_member and password passed.
+ * Sets the SMF-style login cookie and session based on the id_member and password passed.
  * - password should be already encrypted with the cookie salt.
  * - logs the user out if id_member is zero.
  * - sets the cookie and session to last the number of seconds specified by cookie_length.
  * - when logging out, if the globalCookies setting is enabled, attempts to clear the subdomain's cookie too.
  *
- * @param int $cookie_length,
+ * @param int $cookie_length
  * @param int $id The id of the member
  * @param string $password = ''
  */
@@ -110,7 +110,7 @@ function setLoginCookie($cookie_length, $id, $password = '')
  * - normally, local and global should be the localCookies and globalCookies settings, respectively.
  * - uses boardurl to determine these two things.
  *
- * @param bool $local,
+ * @param bool $local
  * @param bool $global
  * @return array an array to set the cookie on with domain and path in it, in that order
  */
@@ -202,7 +202,7 @@ function adminLogin($type = 'admin')
 
 	// Validate what type of session check this is.
 	$types = array();
-	call_integration_hook('integrate_validateSession', array($types));
+	call_integration_hook('integrate_validateSession', array(&$types));
 	$type = in_array($type, $types) || $type == 'moderate' ? $type : 'admin';
 
 	// They used a wrong password, log it and unset that.
@@ -247,11 +247,11 @@ function adminLogin($type = 'admin')
 }
 
 /**
- * used by the adminLogin() function.
+ * Used by the adminLogin() function.
  * if 'value' is an array, the function is called recursively.
  *
- * @param string $key
- * @param string $value
+ * @param string $k key
+ * @param string $v value
  * @return string 'hidden' HTML form fields, containing key-value-pairs
  */
 function adminLogin_outputPostVars($k, $v)
@@ -316,7 +316,7 @@ function construct_query_string($get)
  * - searches for members whose username, display name, or e-mail address match the given pattern of array names.
  * - searches only buddies if buddies_only is set.
  *
- * @param array $names,
+ * @param array $names
  * @param bool $use_wildcards = false, accepts wildcards ? and * in the patern if true
  * @param bool $buddies_only = false,
  * @param int $max = 500 retrieves a maximum of max members, if passed
@@ -399,7 +399,7 @@ function findMembers($names, $use_wildcards = false, $buddies_only = false, $max
 }
 
 /**
- * called by index.php?action=findmember.
+ * Called by index.php?action=findmember.
  * - is used as a popup for searching members.
  * - uses sub template find_members of the Help template.
  * - also used to add members for PM's sent using wap2/imode protocol.
@@ -471,7 +471,7 @@ function JSMembers()
 }
 
 /**
- * outputs each member name on its own line.
+ * Outputs each member name on its own line.
  * - used by javascript to find members matching the request.
  */
 function RequestMembers()
@@ -511,19 +511,7 @@ function RequestMembers()
 		$row['real_name'] = strtr($row['real_name'], array('&amp;' => '&#038;', '&lt;' => '&#060;', '&gt;' => '&#062;', '&quot;' => '&#034;'));
 
 		if (preg_match('~&#\d+;~', $row['real_name']) != 0)
-		{
-			$fixchar = create_function('$n', '
-				if ($n < 128)
-					return chr($n);
-				elseif ($n < 2048)
-					return chr(192 | $n >> 6) . chr(128 | $n & 63);
-				elseif ($n < 65536)
-					return chr(224 | $n >> 12) . chr(128 | $n >> 6 & 63) . chr(128 | $n & 63);
-				else
-					return chr(240 | $n >> 18) . chr(128 | $n >> 12 & 63) . chr(128 | $n >> 6 & 63) . chr(128 | $n & 63);');
-
-			$row['real_name'] = preg_replace('~&#(\d+);~e', '$fixchar(\'$1\')', $row['real_name']);
-		}
+			$row['real_name'] = preg_replace_callback('~&#(\d+);~', 'fixchar__callback', $row['real_name']);
 
 		echo $row['real_name'], "\n";
 	}
@@ -600,30 +588,50 @@ function resetPassword($memID, $username = null)
 /**
  * Checks a username obeys a load of rules
  *
- * @param int $memID,
+ * @param int $memID
  * @param string $username
+ * @param boolean $return_error
+ * @param boolean $check_reserved_name
  * @return string Returns null if fine
  */
-function validateUsername($memID, $username)
+function validateUsername($memID, $username, $return_error = false, $check_reserved_name = true)
 {
-	global $sourcedir, $txt;
+	global $sourcedir, $txt, $smcFunc, $user_info;
+
+	$errors = array();
+
+	// Don't use too long a name.
+	if ($smcFunc['strlen']($username) > 25)
+		$errors[] = array('lang', 'error_long_name');
 
 	// No name?!  How can you register with no name?
 	if ($username == '')
-		fatal_lang_error('need_username', false);
+		$errors[] = array('lang', 'need_username');
 
 	// Only these characters are permitted.
 	if (in_array($username, array('_', '|')) || preg_match('~[<>&"\'=\\\\]~', preg_replace('~&#(?:\\d{1,7}|x[0-9a-fA-F]{1,6});~', '', $username)) != 0 || strpos($username, '[code') !== false || strpos($username, '[/code') !== false)
-		fatal_lang_error('error_invalid_characters_username', false);
+		$errors[] = array('lang', 'error_invalid_characters_username');
 
 	if (stristr($username, $txt['guest_title']) !== false)
-		fatal_lang_error('username_reserved', true, array($txt['guest_title']));
+		$errors[] = array('lang', 'username_reserved', 'general', array($txt['guest_title']));
 
-	require_once($sourcedir . '/Subs-Members.php');
-	if (isReservedName($username, $memID, false))
-		fatal_error('(' . htmlspecialchars($username) . ') ' . $txt['name_in_use'], false);
+	if ($check_reserved_name)
+	{
+		require_once($sourcedir . '/Subs-Members.php');
+		if (isReservedName($username, $memID, false))
+			$errors[] = array('done', '(' . htmlspecialchars($username) . ') ' . $txt['name_in_use']);
+	}
 
-	return null;
+	if ($return_error)
+		return $errors;
+	elseif (empty($errors))
+		return null;
+
+	loadLanguage('Errors');
+	$error = $errors[0];
+
+	$message = $error[0] == 'lang' ? (empty($error[3]) ? $txt[$error[1]] : vsprintf($txt[$error[1]], $error[3])) : $error[1];
+	fatal_error($message, empty($error[2]) || $user_info['is_admin'] ? false : $error[2]);
 }
 
 /**
@@ -728,6 +736,22 @@ function rebuildModCache()
 		while ($row = $smcFunc['db_fetch_assoc']($request))
 			$boards_mod[] = $row['id_board'];
 		$smcFunc['db_free_result']($request);
+		
+		// Can any of the groups they're in moderate any of the boards?
+		$request = $smcFunc['db_query']('', '
+			SELECT id_board
+			FROM {db_prefix}moderator_groups
+			WHERE id_group IN({array_int:groups})',
+			array(
+				'groups' => $user_info['groups'],
+			)
+		);
+		while ($row = $smcFunc['db_fetch_assoc']($request))
+			$boards_mod[] = $row['id_board'];
+		$smcFunc['db_free_result']($request);
+		
+		// Just in case we've got duplicates here...
+		$boards_mod = array_unique($boards_mod);
 	}
 
 	$mod_query = empty($boards_mod) ? '0=1' : 'b.id_board IN (' . implode(',', $boards_mod) . ')';
@@ -743,6 +767,7 @@ function rebuildModCache()
 		'mb' => $boards_mod,
 		'mq' => $mod_query,
 	);
+	call_integration_hook('integrate_mod_cache');
 
 	$user_info['mod_cache'] = $_SESSION['mc'];
 
@@ -770,6 +795,9 @@ function smf_setcookie($name, $value = '', $expire = 0, $path = '', $domain = ''
 		$httponly = !empty($modSettings['httponlyCookies']);
 	if ($secure === null)
 		$secure = !empty($modSettings['secureCookies']);
+
+	// Intercept cookie?
+	call_integration_hook('integrate_cookie', array($name, $value, $expire, $path, $domain, $secure, $httponly));
 
 	// This function is pointless if we have PHP >= 5.2.
 	if (version_compare(PHP_VERSION, '5.2', '>='))

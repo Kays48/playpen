@@ -1,5 +1,5 @@
 <?php
-// Version: 2.0; Errors
+// Version: 2.1; Errors
 
 global $scripturl, $modSettings;
 
@@ -25,6 +25,7 @@ $txt['not_a_user'] = 'The user whose profile you are trying to view does not exi
 $txt['not_a_topic'] = 'This topic doesn\'t exist on this board.';
 $txt['not_approved_topic'] = 'This topic has not been approved yet.';
 $txt['email_in_use'] = 'That email address (%1$s) is being used by a registered member already. If you feel this is a mistake, go to the login page and use the password reminder with that address.';
+$txt['attachments_no_write'] = 'The attachments directory is not writable';
 
 $txt['didnt_select_vote'] = 'You didn\'t select a vote option.';
 $txt['poll_error'] = 'Either that poll doesn\'t exist, the poll has been locked, or you tried to vote twice.';
@@ -37,6 +38,7 @@ $txt['feature_disabled'] = 'Sorry, this feature is disabled.';
 $txt['feature_no_exists'] = 'Sorry, this feature doesn\'t exist.';
 $txt['couldnt_connect'] = 'Could not connect to server or could not find file';
 $txt['no_board'] = 'The board you specified doesn\'t exist';
+$txt['no_message'] = 'The message is no longer available';
 $txt['cant_split'] = 'You are not allowed to split topics';
 $txt['cant_merge'] = 'You are not allowed to merge topics';
 $txt['no_topic_id'] = 'You specified an invalid topic ID.';
@@ -107,7 +109,7 @@ $txt['cannot_post_new'] = 'Sorry, you cannot post new topics in this board.';
 $txt['cannot_post_reply_any'] = 'You are not permitted to post replies to topics on this board.';
 $txt['cannot_post_reply_own'] = 'You are not allowed to post replies even to your own topics in this board.';
 $txt['cannot_profile_remove_own'] = 'Sorry, but you aren\'t allowed to delete your own account.';
-$txt['cannot_profile_remove_any'] = 'You don\'t have the permissions to go about removing people\'s accounts!';
+$txt['cannot_profile_remove_any'] = 'You don\'t have the approriate permissions to remove accounts.';
 $txt['cannot_profile_extra_any'] = 'You are not permitted to modify profile settings.';
 $txt['cannot_profile_identity_any'] = 'You aren\'t allowed to edit account settings.';
 $txt['cannot_profile_title_any'] = 'You cannot edit people\'s custom titles.';
@@ -187,6 +189,12 @@ $txt['no_bantype_selected'] = 'No ban type was selected';
 $txt['ban_not_found'] = 'Ban not found';
 $txt['ban_unknown_restriction_type'] = 'Restriction type unknown';
 $txt['ban_name_empty'] = 'The name of the ban was left empty';
+$txt['ban_id_empty'] = 'Ban id not found';
+$txt['ban_group_id_empty'] = 'Ban group id missing';
+$txt['ban_no_triggers'] = 'No ban triggers specified';
+$txt['ban_ban_item_empty'] = 'Ban trigger not found';
+$txt['impossible_insert_new_bangroup'] = 'An error occurred while inserting the new ban';
+
 $txt['ban_name_exists'] = 'The name of this ban (%1$s) already exists. Please choose a different name.';
 $txt['ban_trigger_already_exists'] = 'This ban trigger (%1$s) already exists in %2$s.';
 
@@ -201,22 +209,22 @@ $txt['who_off'] = 'You cannot access Who\'s Online right now because it is disab
 $txt['merge_create_topic_failed'] = 'Error creating a new topic.';
 $txt['merge_need_more_topics'] = 'Merge topics require at least two topics to merge.';
 
-$txt['postWaitTime_broken'] = 'The last posting from your IP was less than %1$d seconds ago. Please try again later.';
-$txt['registerWaitTime_broken'] = 'You already registered just %1$d seconds ago!';
-$txt['loginWaitTime_broken'] = 'You will have to wait about %1$d seconds to login again, sorry.';
-$txt['pmWaitTime_broken'] = 'The last personal message from your IP was less than %1$d seconds ago. Please try again later.';
-$txt['reporttmWaitTime_broken'] = 'The last topic report from your IP was less than %1$d seconds ago. Please try again later.';
-$txt['sendtopicWaitTime_broken'] = 'The last topic sent from your IP was less than %1$d seconds ago. Please try again later.';
-$txt['sendmailWaitTime_broken'] = 'The last email sent from your IP was less than %1$d seconds ago. Please try again later.';
-$txt['searchWaitTime_broken'] = 'Your last search was less than %1$d seconds ago. Please try again later.';
-$txt['remindWaitTime_broken'] = 'Your last reminder was less than %1$d seconds ago. Please try again later.';
+$txt['post_WaitTime_broken'] = 'The last posting from your IP was less than %1$d seconds ago. Please try again later.';
+$txt['register_WaitTime_broken'] = 'You already registered just %1$d seconds ago!';
+$txt['login_WaitTime_broken'] = 'You will have to wait about %1$d seconds to login again, sorry.';
+$txt['pm_WaitTime_broken'] = 'The last personal message from your IP was less than %1$d seconds ago. Please try again later.';
+$txt['reporttm_WaitTime_broken'] = 'The last topic report from your IP was less than %1$d seconds ago. Please try again later.';
+$txt['sendtopic_WaitTime_broken'] = 'The last topic sent from your IP was less than %1$d seconds ago. Please try again later.';
+$txt['sendmail_WaitTime_broken'] = 'The last email sent from your IP was less than %1$d seconds ago. Please try again later.';
+$txt['search_WaitTime_broken'] = 'Your last search was less than %1$d seconds ago. Please try again later.';
+$txt['remind_WaitTime_broken'] = 'Your last reminder was less than %1$d seconds ago. Please try again later.';
 
 $txt['email_missing_data'] = 'You must enter something in both the subject and message boxes.';
 
 $txt['topic_gone'] = 'The topic or board you are looking for appears to be either missing or off limits to you.';
-$txt['theme_edit_missing'] = 'The file you are trying to edit... can\'t even be found!';
+$txt['theme_edit_missing'] = 'The file you are trying to edit can\'t be found.';
 
-$txt['no_dump_database'] = 'Only administrators can make database backups!';
+$txt['no_dump_database'] = 'Only administrators can make database backups.';
 $txt['pm_not_yours'] = 'The personal message you\'re trying to quote is not your own or does not exist, please go back and try again.';
 $txt['mangled_post'] = 'Mangled form data - please go back and try again.';
 $txt['too_many_groups'] = 'Sorry, you selected too many groups, please remove some.';
@@ -239,19 +247,22 @@ $txt['error_no_question'] = 'No question was filled in for this poll.';
 $txt['error_no_message'] = 'The message body was left empty.';
 $txt['error_long_message'] = 'The message exceeds the maximum allowed length (%1$d characters).';
 $txt['error_no_comment'] = 'The comment field was left empty.';
+// duplicate of post_too_long in Post.{language}.php
+$txt['error_post_too_long'] = 'Your message is too long. Please go back and shorten it, then try again.';
 $txt['error_session_timeout'] = 'Your session timed out while posting. Please try to re-submit your message.';
 $txt['error_no_to'] = 'No recipients specified.';
 $txt['error_bad_to'] = 'One or more \'to\'-recipients could not be found.';
 $txt['error_bad_bcc'] = 'One or more \'bcc\'-recipients could not be found.';
 $txt['error_form_already_submitted'] = 'You already submitted this post!  You might have accidentally double clicked or tried to refresh the page.';
 $txt['error_poll_few'] = 'You must have at least two choices!';
-$txt['error_poll_many'] = 'You must have no more than 256 choices!';
+$txt['error_poll_many'] = 'You must have no more than 256 choices.';
 $txt['error_need_qr_verification'] = 'Please complete the verification section below to complete your post.';
 $txt['error_wrong_verification_code'] = 'The letters you typed don\'t match the letters that were shown in the picture.';
 $txt['error_wrong_verification_answer'] = 'You did not answer the verification questions correctly.';
 $txt['error_need_verification_code'] = 'Please enter the verification code below to continue to the results.';
 $txt['error_bad_file'] = 'Sorry but the file specified could not be opened: %1$s';
 $txt['error_bad_line'] = 'The line you specified is invalid.';
+$txt['error_draft_not_saved'] = 'There was an error saving the draft';
 
 $txt['smiley_not_found'] = 'Smiley not found.';
 $txt['smiley_has_no_code'] = 'No code for this smiley was given.';
@@ -259,12 +270,13 @@ $txt['smiley_has_no_filename'] = 'No filename for this smiley was given.';
 $txt['smiley_not_unique'] = 'A smiley with that code already exists.';
 $txt['smiley_set_already_exists'] = 'A smiley set with that URL already exists';
 $txt['smiley_set_not_found'] = 'Smiley set not found';
+$txt['smiley_set_dir_not_found'] = 'The directory of the smiley set %1$s is either invalid or cannot be accessed';
 $txt['smiley_set_path_already_used'] = 'The URL of the smiley set is already being used by another smiley set.';
 $txt['smiley_set_unable_to_import'] = 'Unable to import smiley set. Either the directory is invalid or cannot be accessed.';
 
 $txt['smileys_upload_error'] = 'Failed to upload file.';
-$txt['smileys_upload_error_blank'] = 'All smiley sets must have an image!';
-$txt['smileys_upload_error_name'] = 'All smileys must have the same filename!';
+$txt['smileys_upload_error_blank'] = 'All smiley sets must have an image.';
+$txt['smileys_upload_error_name'] = 'All smileys must have the same filename.';
 $txt['smileys_upload_error_illegal'] = 'Illegal Type.';
 
 $txt['search_invalid_weights'] = 'Search weights are not properly configured. At least one weight should be configure to be non-zero. Please report this error to an administrator.';
@@ -297,13 +309,13 @@ $txt['error_functionality_not_windows'] = 'Sorry, this functionality is currentl
 // Don't use entities in the below string.
 $txt['attachment_not_found'] = 'Attachment Not Found';
 
-$txt['error_no_boards_selected'] = 'No valid boards were selected!';
+$txt['error_no_boards_selected'] = 'No valid boards were selected.';
 $txt['error_invalid_search_string'] = 'Did you forget to put something to search for?';
 $txt['error_invalid_search_string_blacklist'] = 'Your search query contained too trivial words. Please try again with a different query.';
 $txt['error_search_string_small_words'] = 'Each word must be at least two characters long.';
 $txt['error_query_not_specific_enough'] = 'Your search query didn\'t return any matches.';
 $txt['error_no_messages_in_time_frame'] = 'No messages found in selected time frame.';
-$txt['error_no_labels_selected'] = 'No labels were selected!';
+$txt['error_no_labels_selected'] = 'No labels were selected.';
 $txt['error_no_search_daemon'] = 'Unable to access the search daemon';
 
 $txt['profile_errors_occurred'] = 'The following errors occurred when trying to save your profile';
@@ -324,17 +336,20 @@ $txt['profile_error_password_restricted_words'] = 'Your password must not contai
 $txt['profile_error_password_chars'] = 'Your password must contain a mix of upper and lower case letters, as well as digits.';
 $txt['profile_error_already_requested_group'] = 'You already have an outstanding request for this group!';
 $txt['profile_error_openid_in_use'] = 'Another user is already using that OpenID authentication URL';
-$txt['profile_error_signature_not_yet_saved'] = 'The signature is not yet saved!';
+$txt['profile_error_signature_not_yet_saved'] = 'The signature has not been saved.';
+$txt['profile_error_aim_too_long'] = 'The AIM nickname is too long.';
+$txt['profile_error_personal_text_too_long'] = 'The personal text is too long.';
+$txt['profile_error_user_title_too_long'] = 'The custom title is too long.';
 
 $txt['mysql_error_space'] = ' - check database storage space or contact the server administrator.';
 
 $txt['icon_not_found'] = 'The icon image could not be found in the default theme - please ensure the image has been uploaded and try again.';
-$txt['icon_after_itself'] = 'The icon cannot be positioned after itself!';
+$txt['icon_after_itself'] = 'The icon cannot be positioned after itself.';
 $txt['icon_name_too_long'] = 'Icon filenames cannot be more than 16 characters long';
 
 $txt['name_censored'] = 'Sorry, the name you tried to use, %1$s, contains words which have been censored.  Please try another name.';
 
-$txt['poll_already_exists'] = 'A topic can only have one poll associated with it!';
+$txt['poll_already_exists'] = 'A topic can only have one poll associated with it.';
 $txt['poll_not_found'] = 'There is no poll associated with this topic!';
 
 $txt['error_while_adding_poll'] = 'The following error or errors occurred while adding this poll';
@@ -360,11 +375,11 @@ $txt['themes_none_selectable'] = 'At least one theme must be selectable.';
 $txt['themes_default_selectable'] = 'The overall forum default theme must be a selectable theme.';
 $txt['ignoreboards_disallowed'] = 'The option to ignore boards has not been enabled.';
 
-$txt['mboards_delete_error'] = 'No category selected!';
-$txt['mboards_delete_board_error'] = 'No board selected!';
+$txt['mboards_delete_error'] = 'No category selected.';
+$txt['mboards_delete_board_error'] = 'No board selected.';
 
-$txt['mboards_parent_own_child_error'] = 'Unable to make a parent its own child!';
-$txt['mboards_board_own_child_error'] = 'Unable to make a board its own child!';
+$txt['mboards_parent_own_child_error'] = 'You can not make a parent its own child.';
+$txt['mboards_board_own_child_error'] = 'You can not make a board its own child.';
 
 $txt['smileys_upload_error_notwritable'] = 'The following smiley directories are not writable: %1$s';
 $txt['smileys_upload_error_types'] = 'Smiley images can only have the following extensions: %1$s.';
@@ -372,8 +387,8 @@ $txt['smileys_upload_error_types'] = 'Smiley images can only have the following 
 $txt['change_email_success'] = 'Your email address has been changed, and a new activation email has been sent to it.';
 $txt['resend_email_success'] = 'A new activation email has successfully been sent.';
 
-$txt['custom_option_need_name'] = 'The profile option must have a name!';
-$txt['custom_option_not_unique'] = 'Field name is not unique!';
+$txt['custom_option_need_name'] = 'The profile option must have a name.';
+$txt['custom_option_not_unique'] = 'Field name is not unique.';
 $txt['custom_option_regex_error'] = 'The regex you entered is not valid';
 
 $txt['warning_no_reason'] = 'You must enter a reason for altering the warning state of a member';
@@ -400,7 +415,7 @@ $txt['error_custom_field_empty'] = 'The &quot;%1$s&quot; field cannot be left bl
 
 $txt['email_no_template'] = 'The email template &quot;%1$s&quot; could not be found.';
 
-$txt['search_api_missing'] = 'The search API could not be found! Please contact the admin to check they have uploaded the correct files.';
+$txt['search_api_missing'] = 'The search API could not be found. Please contact the admin to check they have uploaded the correct files.';
 $txt['search_api_not_compatible'] = 'The selected search API the forum is using is out of date - falling back to standard search. Please check file %1$s.';
 
 // Restore topic/posts

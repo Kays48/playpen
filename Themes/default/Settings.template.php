@@ -4,7 +4,7 @@
  *
  * @package SMF
  * @author Simple Machines
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
@@ -131,10 +131,14 @@ function template_options()
 				0 => $txt['display_quick_reply1'],
 				1 => $txt['display_quick_reply2'],
 				2 => $txt['display_quick_reply3'],
-				3 => $txt['display_quick_reply4']
 			),
 			'default' => true,
 		),
+        array(
+            'id' => 'use_editor_quick_reply',
+            'label' => $txt['use_editor_quick_reply'],
+            'default' => true,
+        ),
 		array(
 			'id' => 'display_quick_mod',
 			'label' => $txt['display_quick_mod'],
@@ -186,6 +190,10 @@ function template_settings()
 		array(
 			'id' => 'show_mark_read',
 			'label' => $txt['enable_mark_as_read'],
+		),
+		array(
+			'id' => 'allow_no_censored',
+			'label' => $txt['allow_no_censored'],
 		),
 		array(
 			'id' => 'enable_news',

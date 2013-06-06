@@ -9,14 +9,14 @@
  *
  * @package SMF
  * @author Simple Machines http://www.simplemachines.org
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
  */
 
 if (!defined('SMF'))
-	die('Hacking attempt...');
+	die('No direct access...');
 
 /**
  * Begin the registration process.
@@ -105,7 +105,7 @@ function Register($reg_errors = array())
 			$context['agreement'] = parse_bbc(file_get_contents($boarddir . '/agreement.txt'), true, 'agreement');
 		else
 			$context['agreement'] = '';
-		
+
 		// Nothing to show, lets disable registration and inform the admin of this error
 		if (empty($context['agreement']))
 		{
@@ -279,7 +279,7 @@ function Register2($verifiedOpenID = false)
 	// Collect all extra registration fields someone might have filled in.
 	$possible_strings = array(
 		'website_url', 'website_title',
-		'aim', 'yim',
+		'aim', 'yim', 'skype',
 		'location', 'birthdate',
 		'time_format',
 		'buddy_list',
@@ -317,9 +317,6 @@ function Register2($verifiedOpenID = false)
 		if (trim($_POST['real_name']) != '' && !isReservedName($_POST['real_name']) && $smcFunc['strlen']($_POST['real_name']) < 60)
 			$possible_strings[] = 'real_name';
 	}
-
-	if (isset($_POST['msn']) && preg_match('~^[0-9A-Za-z=_+\-/][0-9A-Za-z=_\'+\-/\.]*@[\w\-]+(\.[\w\-]+)*(\.[\w]{2,6})$~', $_POST['msn']) != 0)
-		$profile_strings[] = 'msn';
 
 	// Handle a string as a birthdate...
 	if (isset($_POST['birthdate']) && $_POST['birthdate'] != '')
@@ -522,7 +519,11 @@ function Register2($verifiedOpenID = false)
  */
 function Activate()
 {
-	global $context, $txt, $modSettings, $scripturl, $sourcedir, $smcFunc, $language;
+	global $context, $txt, $modSettings, $scripturl, $sourcedir, $smcFunc, $language, $user_info;
+
+	// Logged in users should not bother to activate their accounts
+	if (!empty($user_info['id']))
+		redirectexit();
 
 	loadLanguage('Login');
 	loadTemplate('Login');
@@ -568,7 +569,7 @@ function Activate()
 	$smcFunc['db_free_result']($request);
 
 	// Change their email address? (they probably tried a fake one first :P.)
-	if (isset($_POST['new_email'], $_REQUEST['passwd']) && sha1(strtolower($row['member_name']) . $_REQUEST['passwd']) == $row['passwd'])
+	if (isset($_POST['new_email'], $_REQUEST['passwd']) && sha1(strtolower($row['member_name']) . $_REQUEST['passwd']) == $row['passwd'] && ($row['is_activated'] == 0 || $row['is_activated'] == 2))
 	{
 		if (empty($modSettings['registration_method']) || $modSettings['registration_method'] == 3)
 			fatal_lang_error('no_access', false);
@@ -635,7 +636,7 @@ function Activate()
 		elseif ($row['validation_code'] == '')
 		{
 			loadLanguage('Profile');
-			fatal_error($txt['registration_not_approved'] . ' <a href="' . $scripturl . '?action=activate;user=' . $row['member_name'] . '">' . $txt['here'] . '</a>.', false);
+			fatal_error(sprintf($txt['registration_not_approved'], $scripturl . '?action=activate;user=' . $row['member_name']), false);
 		}
 
 		$context['sub_template'] = 'retry_activate';
@@ -832,28 +833,16 @@ function RegisterCheckUsername()
 	// This is XML!
 	loadTemplate('Xml');
 	$context['sub_template'] = 'check_username';
-	$context['checked_username'] = isset($_GET['username']) ? $_GET['username'] : '';
+	$context['checked_username'] = isset($_GET['username']) ? un_htmlspecialchars($_GET['username']) : '';
 	$context['valid_username'] = true;
 
 	// Clean it up like mother would.
 	$context['checked_username'] = preg_replace('~[\t\n\r\x0B\0' . ($context['utf8'] ? '\x{A0}' : '\xA0') . ']+~' . ($context['utf8'] ? 'u' : ''), ' ', $context['checked_username']);
-	if ($smcFunc['strlen']($context['checked_username']) > 25)
-		$context['checked_username'] = $smcFunc['htmltrim']($smcFunc['substr']($context['checked_username'], 0, 25));
 
-	// Only these characters are permitted.
-	if (preg_match('~[<>&"\'=\\\]~', preg_replace('~&#(?:\\d{1,7}|x[0-9a-fA-F]{1,6});~', '', $context['checked_username'])) != 0 || $context['checked_username'] == '_' || $context['checked_username'] == '|' || strpos($context['checked_username'], '[code') !== false || strpos($context['checked_username'], '[/code') !== false)
-		$context['valid_username'] = false;
+	require_once($sourcedir . '/Subs-Auth.php');
+	$errors = validateUsername(0, $context['checked_username'], true);
 
-	if (stristr($context['checked_username'], $txt['guest_title']) !== false)
-		$context['valid_username'] = false;
-
-	if (trim($context['checked_username']) == '')
-		$context['valid_username'] = false;
-	else
-	{
-		require_once($sourcedir . '/Subs-Members.php');
-		$context['valid_username'] &= isReservedName($context['checked_username'], 0, false, false) ? 0 : 1;
-	}
+	$context['valid_username'] = empty($errors);
 }
 
 ?>

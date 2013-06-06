@@ -1,66 +1,134 @@
-var cur_topic_id, cur_msg_id, buff_subject, cur_subject_div, in_edit_mode = 0;
-var hide_prefixes = Array();
-
-function modify_topic(topic_id, first_msg_id)
+// *** QuickModifyTopic object.
+function QuickModifyTopic(oOptions)
 {
-	if (!('XMLHttpRequest' in window))
-		return;
+	this.opt = oOptions;
+	this.aHidePrefixes = this.opt.aHidePrefixes;
+	this.iCurTopicId = 0;
+	this.sCurMessageId = '';
+	this.sBuffSubject = '';
+	this.oCurSubjectDiv = null;
+	this.oTopicModHandle = document;
+	this.bInEditMode = false;
+	this.bMouseOnDiv = false;
+	this.bXmlHttpCapable = this.isXmlHttpCapable();
+	this.init();
+}
 
+// @todo Determine if this is even needed anymore opera meh
+// Ajax supported?
+QuickModifyTopic.prototype.isXmlHttpCapable = function ()
+{
+	if (typeof(window.XMLHttpRequest) == 'undefined')
+		return false;
+
+	// Opera didn't always support POST requests. So test it first.
 	if ('opera' in window)
 	{
 		var oTest = new XMLHttpRequest();
 		if (!('setRequestHeader' in oTest))
-			return;
+			return false;
 	}
 
+	return true;
+}
+
+// Used to initialise the object event handlers
+QuickModifyTopic.prototype.init = function ()
+{
+	// Attach some events to it so we can respond to actions
+	this.oTopicModHandle.instanceRef = this;
+
+	// detect and act on keypress
+	this.oTopicModHandle.onkeydown = function (oEvent) {return this.instanceRef.modify_topic_keypress(oEvent);};
+
+	// Used to detect when we've stopped editing.
+	this.oTopicModHandle.onclick = function (oEvent) {return this.instanceRef.modify_topic_click(oEvent);};
+}
+
+// called from the double click in the div
+QuickModifyTopic.prototype.modify_topic = function (topic_id, first_msg_id)
+{
 	// Add backwards compatibility with old themes.
 	if (typeof(cur_session_var) == 'undefined')
 		cur_session_var = 'sesc';
 
-	if (in_edit_mode == 1)
+	// already editing
+	if (this.bInEditMode)
 	{
-		if (cur_topic_id == topic_id)
+		// same message then just return, otherwise drop out of this edit.
+		if (this.iCurTopicId == topic_id)
 			return;
 		else
-			modify_topic_cancel();
+			this.modify_topic_cancel();
 	}
 
-	in_edit_mode = 1;
-	mouse_on_div = 1;
-	cur_topic_id = topic_id;
+	this.bInEditMode = true;
+	this.bMouseOnDiv = true;
+	this.iCurTopicId = topic_id;
 
-	if (typeof window.ajax_indicator == "function")
-		ajax_indicator(true);
-	getXMLDocument(smf_prepareScriptUrl(smf_scripturl) + "action=quotefast;quote=" + first_msg_id + ";modify;xml", onDocReceived_modify_topic);
+	// Get the topics current subject 
+	ajax_indicator(true);
+	sendXMLDocument.call(this, smf_prepareScriptUrl(smf_scripturl) + "action=quotefast;quote=" + first_msg_id + ";modify;xml", '', this.onDocReceived_modify_topic);
 }
 
-function onDocReceived_modify_topic(XMLDoc)
+// callback function from the modify_topic ajax call
+QuickModifyTopic.prototype.onDocReceived_modify_topic = function (XMLDoc)
 {
-	cur_msg_id = XMLDoc.getElementsByTagName("message")[0].getAttribute("id");
+	// If it is not valid then clean up
+	if (!XMLDoc || !XMLDoc.getElementsByTagName('message'))
+	{
+		this.modify_topic_cancel();
+		return true;
+	}
+	
+	this.sCurMessageId = XMLDoc.getElementsByTagName("message")[0].getAttribute("id");
+	this.oCurSubjectDiv = document.getElementById('msg_' + this.sCurMessageId.substr(4));
+	this.sBuffSubject = getInnerHTML(this.oCurSubjectDiv);
 
-	cur_subject_div = document.getElementById('msg_' + cur_msg_id.substr(4));
-	buff_subject = getInnerHTML(cur_subject_div);
+	// Here we hide any other things they want hidden on edit.
+	this.set_hidden_topic_areas('none');
 
-	// Here we hide any other things they want hiding on edit.
-	set_hidden_topic_areas('none');
-
-	modify_topic_show_edit(XMLDoc.getElementsByTagName("subject")[0].childNodes[0].nodeValue);
-	if (typeof window.ajax_indicator == "function")
-		ajax_indicator(false);
+	// Show we are in edit mode and allow the edit
+	ajax_indicator(false);
+	this.modify_topic_show_edit(XMLDoc.getElementsByTagName("subject")[0].childNodes[0].nodeValue);
 }
 
-function modify_topic_cancel()
+// Cancel out of an edit and return things to back to what they were
+QuickModifyTopic.prototype.modify_topic_cancel = function ()
 {
-	setInnerHTML(cur_subject_div, buff_subject);
-	set_hidden_topic_areas('');
-
-	in_edit_mode = 0;
+	setInnerHTML(this.oCurSubjectDiv, this.sBuffSubject);
+	this.set_hidden_topic_areas('');
+	this.bInEditMode = false;
+	
 	return false;
 }
 
-function modify_topic_save(cur_session_id, cur_session_var)
+// Simply restore/show any hidden bits during topic editing.
+QuickModifyTopic.prototype.set_hidden_topic_areas = function (set_style)
 {
-	if (!in_edit_mode)
+	for (var i = 0; i < this.aHidePrefixes.length; i++)
+	{
+		if (document.getElementById(this.aHidePrefixes[i] + this.sCurMessageId.substr(4)) != null)
+			document.getElementById(this.aHidePrefixes[i] + this.sCurMessageId.substr(4)).style.display = set_style;
+	}
+}
+
+// For templating, shown that an inline edit is being made.
+QuickModifyTopic.prototype.modify_topic_show_edit = function (subject)
+{
+	// Just template the subject.
+	setInnerHTML(this.oCurSubjectDiv, '<input type="text" name="subject" value="' + subject + '" size="60" style="width: 95%;" maxlength="80" class="input_text" /><input type="hidden" name="topic" value="' + this.iCurTopicId + '" /><input type="hidden" name="msg" value="' + this.sCurMessageId.substr(4) + '" />');
+	
+	// attach mouse over and out events to this new div
+	this.oCurSubjectDiv.instanceRef = this;
+	this.oCurSubjectDiv.onmouseout = function (oEvent) {return this.instanceRef.modify_topic_mouseout(oEvent);};
+	this.oCurSubjectDiv.onmouseover = function (oEvent) {return this.instanceRef.modify_topic_mouseover(oEvent);};
+}
+
+// Yup thats right, save it
+QuickModifyTopic.prototype.modify_topic_save = function (cur_session_id, cur_session_var)
+{
+	if (!this.bInEditMode)
 		return true;
 
 	// Add backwards compatibility with old themes.
@@ -72,18 +140,22 @@ function modify_topic_save(cur_session_id, cur_session_var)
 	x[x.length] = 'topic=' + parseInt(document.forms.quickModForm.elements['topic'].value);
 	x[x.length] = 'msg=' + parseInt(document.forms.quickModForm.elements['msg'].value);
 
-	if (typeof window.ajax_indicator == "function")
-		ajax_indicator(true);
-	sendXMLDocument(smf_prepareScriptUrl(smf_scripturl) + "action=jsmodify;topic=" + parseInt(document.forms.quickModForm.elements['topic'].value) + ";" + cur_session_var + "=" + cur_session_id + ";xml", x.join("&"), modify_topic_done);
+	// send in the call to save the updated topic subject
+	ajax_indicator(true);
+	sendXMLDocument.call(this, smf_prepareScriptUrl(smf_scripturl) + "action=jsmodify;topic=" + parseInt(document.forms.quickModForm.elements['topic'].value) + ";" + cur_session_var + "=" + cur_session_id + ";xml", x.join("&"), this.modify_topic_done);
 
 	return false;
 }
 
-function modify_topic_done(XMLDoc)
+// done with the edit, if all went well show the new topic title
+QuickModifyTopic.prototype.modify_topic_done = function (XMLDoc)
 {
-	if (!XMLDoc)
+	ajax_indicator(false);
+	
+	// If it is not valid then clean up
+	if (!XMLDoc || !XMLDoc.getElementsByTagName('subject'))
 	{
-		modify_topic_cancel();
+		this.modify_topic_cancel();
 		return true;
 	}
 
@@ -91,31 +163,70 @@ function modify_topic_done(XMLDoc)
 	var subject = message.getElementsByTagName("subject")[0];
 	var error = message.getElementsByTagName("error")[0];
 
-	if (typeof window.ajax_indicator == "function")
-		ajax_indicator(false);
+	// No subject or other error?
 
 	if (!subject || error)
 		return false;
 
-	subjectText = subject.childNodes[0].nodeValue;
+	this.modify_topic_hide_edit(subject.childNodes[0].nodeValue);
+	this.set_hidden_topic_areas('');
+	this.bInEditMode = false;
 
-	modify_topic_hide_edit(subjectText);
-
-	set_hidden_topic_areas('');
-
-	in_edit_mode = 0;
-
+	// redo tips if they are on since we just pulled the rug out on this one 
+	if ($.isFunction($.fn.SMFtooltip));
+		$('.preview').SMFtooltip().smf_tooltip_off;
+	
 	return false;
 }
 
-// Simply restore any hidden bits during topic editing.
-function set_hidden_topic_areas(set_style)
+// Done with the edit, put in new subject and link.
+QuickModifyTopic.prototype.modify_topic_hide_edit = function (subject)
 {
-	for (var i = 0; i < hide_prefixes.length; i++)
+	// Re-template the subject!
+	setInnerHTML(this.oCurSubjectDiv, '<a href="' + smf_scripturl + '?topic=' + this.iCurTopicId + '.0">' + subject + '<' +'/a>');
+}
+
+// keypress event ... like enter or escape
+QuickModifyTopic.prototype.modify_topic_keypress = function (oEvent)
+{
+	if (typeof(oEvent.keyCode) != "undefined" && this.bInEditMode)
 	{
-		if (document.getElementById(hide_prefixes[i] + cur_msg_id.substr(4)) != null)
-			document.getElementById(hide_prefixes[i] + cur_msg_id.substr(4)).style.display = set_style;
+		if (oEvent.keyCode == 27)
+		{
+			this.modify_topic_cancel();
+			if (typeof(oEvent.preventDefault) == "undefined")
+				oEvent.returnValue = false;
+			else
+				oEvent.preventDefault();
+		}
+		else if (oEvent.keyCode == 13)
+		{
+			this.modify_topic_save(smf_session_id, smf_session_var);
+			if (typeof(oEvent.preventDefault) == "undefined")
+				oEvent.returnValue = false;
+			else
+				oEvent.preventDefault();
+		}
 	}
+}
+
+// A click event to signal the finish of the edit 
+QuickModifyTopic.prototype.modify_topic_click = function (oEvent)
+{
+	if (this.bInEditMode && !this.bMouseOnDiv)
+		this.modify_topic_save(smf_session_id, smf_session_var);
+}
+
+// Moved out of the editing div
+QuickModifyTopic.prototype.modify_topic_mouseout = function (oEvent)
+{
+	this.bMouseOnDiv = false;
+}
+
+// Moved back over the editing div
+QuickModifyTopic.prototype.modify_topic_mouseover = function (oEvent)
+{
+	this.bMouseOnDiv = true;
 }
 
 // *** QuickReply object.
@@ -196,13 +307,15 @@ function QuickModify(oOptions)
 	this.sMessageBuffer = '';
 	this.sSubjectBuffer = '';
 	this.bXmlHttpCapable = this.isXmlHttpCapable();
+	this.aAccessKeys = new Array();
 
 	// Show the edit buttons
 	if (this.bXmlHttpCapable)
 	{
-		for (var i = document.images.length - 1; i >= 0; i--)
-			if (document.images[i].id.substr(0, 14) == 'modify_button_')
-				document.images[i].style.display = '';
+		var aShowQuickModify = document.getElementsByClassName(this.opt.sClassName);
+		for (var i = 0, length = aShowQuickModify.length; i < length; i++) {
+			aShowQuickModify[i].style.display = "inline";
+		}
 	}
 }
 
@@ -233,6 +346,23 @@ QuickModify.prototype.modifyMsg = function (iMessageId)
 	if (typeof(sSessionVar) == 'undefined')
 		sSessionVar = 'sesc';
 
+	// Removes the accesskeys from the quickreply inputs and saves them in an array to use them later
+	if (typeof(this.opt.sFormRemoveAccessKeys) != 'undefined')
+	{
+		if (typeof(document.forms[this.opt.sFormRemoveAccessKeys]))
+		{
+			var aInputs = document.forms[this.opt.sFormRemoveAccessKeys].getElementsByTagName('input');
+			for (var i = 0; i < aInputs.length; i++)
+			{
+				if (aInputs[i].accessKey != '')
+				{
+					this.aAccessKeys[aInputs[i].name] = aInputs[i].accessKey;
+					aInputs[i].accessKey = '';
+				}
+			}
+		}
+	}
+
 	// First cancel if there's another message still being edited.
 	if (this.bInEditMode)
 		this.modifyCancel();
@@ -242,11 +372,7 @@ QuickModify.prototype.modifyMsg = function (iMessageId)
 
 	// Send out the XMLhttp request to get more info
 	ajax_indicator(true);
-
-	// For IE 5.0 support, 'call' is not yet used.
-	this.tmpMethod = getXMLDocument;
-	this.tmpMethod(smf_prepareScriptUrl(this.opt.sScriptUrl) + 'action=quotefast;quote=' + iMessageId + ';modify;xml', this.onMessageReceived);
-	delete this.tmpMethod;
+	sendXMLDocument.call(this, smf_prepareScriptUrl(smf_scripturl) + 'action=quotefast;quote=' + iMessageId + ';modify;xml', '', this.onMessageReceived);
 }
 
 // The callback function used for the XMLhttp request retrieving the message.
@@ -299,6 +425,22 @@ QuickModify.prototype.modifyCancel = function ()
 	// No longer in edit mode, that's right.
 	this.bInEditMode = false;
 
+	// Let's put back the accesskeys to their original place
+	if (typeof(this.opt.sFormRemoveAccessKeys) != 'undefined')
+	{
+		if (typeof(document.forms[this.opt.sFormRemoveAccessKeys]))
+		{
+			var aInputs = document.forms[this.opt.sFormRemoveAccessKeys].getElementsByTagName('input');
+			for (var i = 0; i < aInputs.length; i++)
+			{
+				if (typeof(this.aAccessKeys[aInputs[i].name]) != 'undefined')
+				{
+					aInputs[i].name = this.aAccessKeys[aInputs[i].name];
+				}
+			}
+		}
+	}
+
 	return false;
 }
 
@@ -312,6 +454,23 @@ QuickModify.prototype.modifySave = function (sSessionId, sSessionVar)
 	// Add backwards compatibility with old themes.
 	if (typeof(sSessionVar) == 'undefined')
 		sSessionVar = 'sesc';
+
+	// Let's put back the accesskeys to their original place
+	if (typeof(this.opt.sFormRemoveAccessKeys) != 'undefined')
+	{
+		if (typeof(document.forms[this.opt.sFormRemoveAccessKeys]))
+		{
+			var aInputs = document.forms[this.opt.sFormRemoveAccessKeys].getElementsByTagName('input');
+			for (var i = 0; i < aInputs.length; i++)
+			{
+				if (typeof(this.aAccessKeys[aInputs[i].name]) != 'undefined')
+				{
+					aInputs[i].name = this.aAccessKeys[aInputs[i].name];
+				}
+			}
+		}
+	}
+
 
 	var i, x = new Array();
 	x[x.length] = 'subject=' + escape(document.forms.quickModForm['subject'].value.replace(/&#/g, "&#38;#").php_to8bit()).replace(/\+/g, "%2B");
@@ -477,37 +636,24 @@ InTopicModeration.prototype.handleClick = function(oCheckbox)
 	// Show the number of messages selected in the button.
 	if (this.opt.bCanRemove && !this.opt.bUseImageButton)
 	{
-		setInnerHTML(document.getElementById(this.opt.sSelf + '_remove_button'), this.opt.sRemoveButtonLabel + ' [' + this.iNumSelected + ']');
+		setInnerHTML(document.getElementById(this.opt.sSelf + '_remove_button_text'), this.opt.sRemoveButtonLabel + ' [' + this.iNumSelected + ']');
 		document.getElementById(this.opt.sSelf + '_remove_button').style.display = this.iNumSelected < 1 ? "none" : "";
 	}
 
 	if (this.opt.bCanRestore && !this.opt.bUseImageButton)
 	{
-		setInnerHTML(document.getElementById(this.opt.sSelf + '_restore_button'), this.opt.sRestoreButtonLabel + ' [' + this.iNumSelected + ']');
+		setInnerHTML(document.getElementById(this.opt.sSelf + '_restore_button_text'), this.opt.sRestoreButtonLabel + ' [' + this.iNumSelected + ']');
 		document.getElementById(this.opt.sSelf + '_restore_button').style.display = this.iNumSelected < 1 ? "none" : "";
 	}
 
 	if (this.opt.bCanSplit && !this.opt.bUseImageButton)
 	{
-		setInnerHTML(document.getElementById(this.opt.sSelf + '_split_button'), this.opt.sSplitButtonLabel + ' [' + this.iNumSelected + ']');
+		setInnerHTML(document.getElementById(this.opt.sSelf + '_split_button_text'), this.opt.sSplitButtonLabel + ' [' + this.iNumSelected + ']');
 		document.getElementById(this.opt.sSelf + '_split_button').style.display = this.iNumSelected < 1 ? "none" : "";
 	}
 
-	// Try to restore the correct position.
-	var aItems = document.getElementById(this.opt.sButtonStrip).getElementsByTagName('span');
-	if (aItems.length > 3)
-	{
-		if (this.iNumSelected < 1)
-		{
-			aItems[aItems.length - 3].className = aItems[aItems.length - 3].className.replace(/\s*position_holder/, 'last');
-			aItems[aItems.length - 2].className = aItems[aItems.length - 2].className.replace(/\s*position_holder/, 'last');
-		}
-		else
-		{
-			aItems[aItems.length - 2].className = aItems[aItems.length - 2].className.replace(/\s*last/, 'position_holder');
-			aItems[aItems.length - 3].className = aItems[aItems.length - 3].className.replace(/\s*last/, 'position_holder');
-		}
-	}
+	if(typeof smf_fixButtonClass == 'function')
+		smf_fixButtonClass(this.opt.sButtonStrip);
 }
 
 InTopicModeration.prototype.handleSubmit = function (sSubmitType)
@@ -581,34 +727,30 @@ function expandThumb(thumbID)
 	return false;
 }
 
-// For templating, shown when an inline edit is made.
-function modify_topic_show_edit(subject)
+function ignore_toggles(msgids, text)
 {
-	// Just template the subject.
-	setInnerHTML(cur_subject_div, '<input type="text" name="subject" value="' + subject + '" size="60" style="width: 95%;" maxlength="80" onkeypress="modify_topic_keypress(event)" class="input_text" /><input type="hidden" name="topic" value="' + cur_topic_id + '" /><input type="hidden" name="msg" value="' + cur_msg_id.substr(4) + '" />');
-}
-
-function modify_topic_click()
-{
-	if (in_edit_mode == 1 && mouse_on_div == 0)
-		modify_topic_save(smf_sesion_id, smf_session_var);
-}
-
-function modify_topic_keypress(oEvent)
-{
-	if (typeof(oEvent.keyCode) != "undefined" && oEvent.keyCode == 13)
+	for (i = 0; i < msgids.length; i++)
 	{
-		modify_topic_save(smf_sesion_id, smf_session_var);
-		if (typeof(oEvent.preventDefault) == "undefined")
-			oEvent.returnValue = false;
-		else
-			oEvent.preventDefault();
-	}
-}
+		var msgid = msgids[i];
+		new smc_Toggle({
+			bToggleEnabled: true,
+			bCurrentlyCollapsed: true,
+			aSwappableContainers: [
+				'msg_' + msgid + '_extra_info',
+				'msg_' + msgid,
+				'msg_' + msgid + '_footer',
+				'msg_' + msgid + '_quick_mod',
+				'modify_button_' + msgid,
+				'msg_' + msgid + '_signature'
 
-// And the reverse for hiding it.
-function modify_topic_hide_edit(subject)
-{
-	// Re-template the subject!
-	setInnerHTML(cur_subject_div, '<a href="' + smf_scripturl + '?topic=' + cur_topic_id + '.0">' + subject + '<' +'/a>');
+			],
+			aSwapLinks: [
+				{
+					sId: 'msg_' + msgid + '_ignored_link',
+					msgExpanded: '',
+					msgCollapsed: text
+				}
+			]
+		});
+	}
 }

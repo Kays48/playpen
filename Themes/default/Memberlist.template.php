@@ -4,7 +4,7 @@
  *
  * @package SMF
  * @author Simple Machines
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
@@ -17,6 +17,10 @@ function template_main()
 
 	echo '
 	<div class="main_section" id="memberlist">
+		<div class="pagesection">
+			', template_button_strip($context['memberlist_buttons'], 'right'), '
+			<div class="pagelinks floatleft">', $context['page_index'], '</div>
+		</div>
 		<div class="cat_bar">
 			<h4 class="catbg">
 				<span class="floatleft">', $txt['members_list'], '</span>';
@@ -25,10 +29,6 @@ function template_main()
 				<span class="floatright">', $context['letter_links'], '</span>';
 		echo '
 			</h4>
-		</div>
-		<div class="pagesection">
-			', template_button_strip($context['memberlist_buttons'], 'right'), '
-			<div class="pagelinks floatleft">', $txt['pages'], ': ', $context['page_index'], '</div>
 		</div>';
 
 	echo '
@@ -95,10 +95,10 @@ function template_main()
 			echo '
 					<td class="centertext">', $member['yim']['link'], '</td>';
 
-		// MSN?
-		if (!isset($context['disabled_fields']['msn']))
+		// Skype?
+		if (!isset($context['disabled_fields']['skype']))
 			echo '
-					<td class="centertext">', $member['msn']['link'], '</td>';
+					<td class="centertext">', $member['skype']['link'], '</td>';
 
 		// Group and date.
 		echo '
@@ -123,7 +123,7 @@ function template_main()
 
 		echo '
 				</tr>';
-				
+
 			$alternate = !$alternate;
 		}
 	}
@@ -138,11 +138,11 @@ function template_main()
 			</tbody>
 			</table>
 		</div>';
-		
+
 	// Show the page numbers again. (makes 'em easier to find!)
 	echo '
 		<div class="pagesection">
-			<div class="pagelinks floatleft">', $txt['pages'], ': ', $context['page_index'], '</div>';
+			<div class="pagelinks floatleft">', $context['page_index'], '</div>';
 
 	// If it is displaying the result of a search show a "search again" link to edit their criteria.
 	if (isset($context['old_search']))
@@ -163,20 +163,15 @@ function template_search()
 	echo '
 	<form action="', $scripturl, '?action=mlist;sa=search" method="post" accept-charset="', $context['character_set'], '">
 		<div id="memberlist">
-			<div class="cat_bar">
-				<h3 class="catbg mlist">
-					<span class="ie6_header floatleft">', !empty($settings['use_buttons']) ? '<img src="' . $settings['images_url'] . '/buttons/search.png" alt="" class="icon" />' : '', $txt['mlist_search'], '</span>
-				</h3>
-			</div>
 			<div class="pagesection">
 				', template_button_strip($context['memberlist_buttons'], 'right'), '
-			</div>';
-	
-	// Display the input boxes for the form.
-	echo '	<div id="memberlist_search" class="clear">
-				<span class="upperframe"><span></span></span>';
-	
-	echo '
+			</div>
+			<div class="cat_bar">
+				<h3 class="catbg mlist">
+					', !empty($settings['use_buttons']) ? '<img src="' . $settings['images_url'] . '/buttons/search_hd.png" alt="" class="icon" />' : '', $txt['mlist_search'], '
+				</h3>
+			</div>
+			<div id="memberlist_search" class="clear">
 				<div class="roundframe">
 					<dl id="mlist_search" class="settings">
 						<dt>
@@ -196,14 +191,13 @@ function template_search()
 							<label for="fields-', $id, '"><input type="checkbox" name="fields[]" id="fields-', $id, '" value="', $id, '" ', in_array($id, $context['search_defaults']) ? 'checked="checked"' : '', ' class="input_check floatright" />', $title, '</label>
 						</dd>';
 	}
+
 	echo '
 					</dl>
-					<hr class="hrcolor" />
-					<input type="submit" name="submit" value="' . $txt['search'] . '" class="button_submit" />
-					<br class="clear_right" />
-				</div>';	
-	echo '
-				<span class="lowerframe"><span></span></span>
+					<div class="flow_auto">
+						<input type="submit" name="submit" value="' . $txt['search'] . '" class="button_submit" />
+					</div>
+				</div>
 			</div>
 		</div>
 	</form>';

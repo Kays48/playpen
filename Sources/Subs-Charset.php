@@ -5,19 +5,19 @@
  *
  * @package SMF
  * @author Simple Machines http://www.simplemachines.org
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
  */
 
 if (!defined('SMF'))
-	die('Hacking attempt...');
+	die('No direct access...');
 
-/** 
+/**
  * Converts the given UTF-8 string into lowercase.
  * equivalent to mb_strtolower($string, 'UTF-8')
- * 
+ *
  * @param string $string
  * @return string
  */
@@ -286,7 +286,7 @@ function utf8_strtolower($string)
 /**
  * Convert the given UTF-8 string to uppercase.
  * equivalent to mb_strtoupper($string, 'UTF-8')
- * 
+ *
  * @param string $string
  * @return string
  */
@@ -588,3 +588,5 @@ function fix_serialized_columns()
 	));
 
 }
+
+?>

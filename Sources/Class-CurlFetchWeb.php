@@ -1,7 +1,19 @@
 <?php
 /**
- *
  * Simple Machines Forum (SMF)
+ *
+ * @package SMF
+ * @author Simple Machines http://www.simplemachines.org
+ * @copyright 2012 Simple Machines
+ * @license http://www.simplemachines.org/about/smf/license.php BSD
+ *
+ * @version 2.1 Alpha 1
+ */
+
+if (!defined('SMF'))
+	die('No direct access...');
+
+/**
  * Simple cURL class to fetch a web page
  * Properly redirects even with safe mode and basedir restrictions
  * Can provide simple post options to a page
@@ -18,26 +30,19 @@
  *  - $fetch_data('http://www.simplemachines.org', array('user' => 'name', 'password' => 'password')); // post to a page
  *  - $fetch_data('http://www.simplemachines.org', parameter1&parameter2&parameter3); // post to a page
  *
- *
  * Get the data
  *  - $fetch_data->result('body'); // just the page content
  *  - $fetch_data->result(); // an array of results, body, header, http result codes
  *  - $fetch_data->result_raw(); // show all results of all calls (in the event of a redirect)
  *  - $fetch_data->result_raw(0); // show all results of call x
- *
- * @package SMF
- * @author Simple Machines http://www.simplemachines.org
- * @copyright 2011 Simple Machines
- * @license http://www.simplemachines.org/about/smf/license.php BSD
- *
- * @version 2.1 Alpha 1
  */
-
-if (!defined('SMF'))
-	die('Hacking attempt...');
-
 class curl_fetch_web_data
 {
+	/**
+	 * Set the default items for this class
+	 *
+	 * @var type
+	 */
 	private $default_options = array(
 		CURLOPT_RETURNTRANSFER	=> 1, // Get returned value as a string (don't output it)
 		CURLOPT_HEADER			=> 1, // We need the headers to do our own redirect
@@ -56,8 +61,8 @@ class curl_fetch_web_data
 	* Start the curl object
 	* - allow for user override values
 	*
-	* @param type $options, cURL options as an array
-	* @param type $max_redirect, use to overide the default of 3
+	* @param type $options cURL options as an array
+	* @param type $max_redirect use to overide the default of 3
 	*/
 	public function __construct($options = array(), $max_redirect = 3)
 	{
@@ -67,14 +72,14 @@ class curl_fetch_web_data
 	}
 
 	/**
-	* Main calling function, 
+	* Main calling function,
 	*  - will request the page data from a given $url
 	*  - optionally will post data to the page form if post data is supplied
 	*  - passed arrays will be converted to a post string joined with &'s
 	*  - calls set_options to set the curl opts array values based on the defaults and user input
 	*
-	* @param type $url, the site we are going to fetch
-	* @param type $post_data, any post data as form name => value
+	* @param type $url the site we are going to fetch
+	* @param type $post_data any post data as form name => value
 	*/
 	public function get_url_data($url, $post_data = array())
 	{
@@ -87,6 +92,8 @@ class curl_fetch_web_data
 		// set the options and get it
 		$this->set_options();
 		$this->curl_request(str_replace(' ', '%20', $url));
+
+		return $this;
 	}
 
 	/**
@@ -94,8 +101,8 @@ class curl_fetch_web_data
 	*  - stores responses (url, code, error, headers, body) in the response array
 	*  - detects 301, 302, 307 codes and will redirect to the given response header location
 	*
-	* @param type $url, site to fetch
-	* @param type $redirect, flag to indicate if this was a redirect request or not
+	* @param type $url site to fetch
+	* @param type $redirect flag to indicate if this was a redirect request or not
 	* @return boolean
 	*/
 	private function curl_request($url, $redirect = false)
@@ -119,12 +126,12 @@ class curl_fetch_web_data
 		curl_exec($cr);
 
 		// Get what was returned
-		$curl_info		= curl_getinfo($cr);
-		$curl_content	= curl_multi_getcontent($cr);
-		$url			= $curl_info['url']; // Last effective URL
-		$http_code		= $curl_info['http_code']; // Last HTTP code
-		$body			= (!curl_error($cr)) ? substr($curl_content, $curl_info['header_size']) : false;
-		$error			= (curl_error($cr)) ? curl_error($cr) : false;
+		$curl_info = curl_getinfo($cr);
+		$curl_content = curl_multi_getcontent($cr);
+		$url = $curl_info['url']; // Last effective URL
+		$http_code = $curl_info['http_code']; // Last HTTP code
+		$body = (!curl_error($cr)) ? substr($curl_content, $curl_info['header_size']) : false;
+		$error = (curl_error($cr)) ? curl_error($cr) : false;
 
 		// close this request
 		curl_close($cr);
@@ -150,8 +157,8 @@ class curl_fetch_web_data
 	/**
 	* Used if being redirected to ensure we have a fully qualified address
 	*
-	* @param type $last_url, where we went to
-	* @param type $new_url, where we were redirected to
+	* @param type $last_url where we went to
+	* @param type $new_url where we were redirected to
 	* @return new url location
 	*/
 	private function get_redirect_url($last_url = '', $new_url = '')
@@ -162,9 +169,9 @@ class curl_fetch_web_data
 
 		// redirect headers are often incomplete or relative so we need to make sure they are fully qualified
 		$new_url_parse['scheme'] = isset($new_url_parse['scheme']) ? $new_url_parse['scheme'] : $last_url_parse['scheme'];
-		$new_url_parse['host']   = isset($new_url_parse['host']) ? $new_url_parse['host'] : $last_url_parse['host'];
-		$new_url_parse['path']   = isset($new_url_parse['path']) ? $new_url_parse['path'] : $last_url_parse['path'];
-		$new_url_parse['query']  = isset($new_url_parse['query']) ? $new_url_parse['query'] : '';
+		$new_url_parse['host'] = isset($new_url_parse['host']) ? $new_url_parse['host'] : $last_url_parse['host'];
+		$new_url_parse['path'] = isset($new_url_parse['path']) ? $new_url_parse['path'] : $last_url_parse['path'];
+		$new_url_parse['query'] = isset($new_url_parse['query']) ? $new_url_parse['query'] : '';
 
 		// Build the new URL that was in the http header
 		return $new_url_parse['scheme'] . '://' . $new_url_parse['host'] . $new_url_parse['path'] . (!empty($new_url_parse['query']) ? '?' . $new_url_parse['query'] : '');
@@ -175,7 +182,7 @@ class curl_fetch_web_data
 	*  - called as ->result() will return the full final array
 	*  - called as ->result('body') to just return the page source of the result
 	*
-	* @param type $area, used to return an area such as body, header, error
+	* @param type $area used to return an area such as body, header, error
 	* @return type
 	*/
 	public function result($area = '')
@@ -191,7 +198,7 @@ class curl_fetch_web_data
 
 	/**
 	* Will return all results from all loops (redirects)
-	*  - Can be call as ->result_raw(x) where x is a specific loop results.
+	*  - Can be called as ->result_raw(x) where x is a specific loop results.
 	*  - Call as ->result_raw() for everything.
 	*
 	* @param type $response_number
@@ -221,16 +228,16 @@ class curl_fetch_web_data
 		if (is_array($post_data))
 		{
 			$postvars = array();
-			
+
 			// build the post data, drop ones with leading @'s since those can be used to send files, we don't support that.
 			foreach ($post_data as $name => $value)
 				$postvars[] = $name . '=' . urlencode($value[0] == '@' ? '' : $value);
-			
+
 			return implode('&', $postvars);
 		}
 		else
 			return $post_data;
-		
+
 	}
 
 	/**

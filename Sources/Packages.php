@@ -7,14 +7,14 @@
  *
  * @package SMF
  * @author Simple Machines http://www.simplemachines.org
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
  */
 
 if (!defined('SMF'))
-	die('Hacking attempt...');
+	die('No direct access...');
 
 /**
  * This is the notoriously defunct package manager..... :/.
@@ -341,7 +341,13 @@ function PackageInstallTest()
 		elseif ($action['type'] == 'redirect')
 			continue;
 		elseif ($action['type'] == 'error')
+		{
 			$context['has_failure'] = true;
+			if (isset($action['error_msg']) && isset($action['error_var']))
+				$context['failure_details'] = sprintf($txt['package_will_fail_' . $action['error_msg']], $action['error_var']);
+			elseif (isset($action['error_msg']))
+				$context['failure_details'] = isset($txt['package_will_fail_' . $action['error_msg']]) ? $txt['package_will_fail_' . $action['error_msg']] : $action['error_msg'];
+		}
 		elseif ($action['type'] == 'modification')
 		{
 			if (!file_exists($boarddir . '/Packages/temp/' . $context['base_path'] . $action['filename']))
@@ -622,7 +628,7 @@ function PackageInstallTest()
 				// Is the action already stated?
 				$theme_action = !empty($action['theme_action']) && in_array($action['theme_action'], array('no', 'yes', 'auto')) ? $action['theme_action'] : 'auto';
 				$action['unparsed_destination'] = $action['unparsed_filename'];
-				
+
 				// If it's not auto do we think we have something we can act upon?
 				if ($theme_action != 'auto' && !in_array($matches[1], array('languagedir', 'languages_dir', 'imagesdir', 'themedir')))
 					$theme_action = '';
@@ -642,7 +648,12 @@ function PackageInstallTest()
 		if (empty($thisAction))
 			continue;
 
-		if (!file_exists($boarddir . '/Packages/temp/' . $context['base_path'] . $action['filename']))
+		if ($context['uninstalling'])
+			$file = in_array($action['type'], array('remove-dir', 'remove-file')) ? $action['filename'] : $boarddir . '/Packages/temp/' . $context['base_path'] . $action['filename'];
+		else
+			$file =  $boarddir . '/Packages/temp/' . $context['base_path'] . $action['filename'];
+
+		if (isset($action['filename']) && !file_exists($file))
 		{
 			$context['has_failure'] = true;
 
@@ -686,7 +697,7 @@ function PackageInstallTest()
 				if (isset($theme_data['theme_dir']) && $id != 1)
 				{
 					$real_path = $theme_data['theme_dir'] . $path;
-					
+
 					// Confirm that we don't already have this dealt with by another entry.
 					if (!in_array(strtolower(strtr($real_path, array('\\' => '/'))), $themeFinds['other_themes']))
 					{
@@ -698,7 +709,7 @@ function PackageInstallTest()
 								$temp = dirname($temp);
 							$chmod_files[] = $temp;
 						}
-						
+
 						if ($action_data['type'] == 'require-dir' && !is_writable($real_path) && (file_exists($real_path) || !is_writable(dirname($real_path))))
 							$chmod_files[] = $real_path;
 
@@ -742,6 +753,7 @@ function PackageInstallTest()
 		$context['ftp_needed'] = !empty($ftp_status['files']['notwritable']) && !empty($context['package_ftp']);
 	}
 
+	$context['post_url'] = $scripturl .'?action=admin;area=packages;sa=' . ($context['uninstalling'] ? 'uninstall' : 'install') . ($context['ftp_needed'] ? '' : '2') . ';package=' . $context['filename'] . ';pid=' . $context['install_id'];
 	checkSubmitOnce('register');
 }
 
@@ -1008,9 +1020,9 @@ function PackageInstall()
 			elseif ($action['type'] == 'hook' && isset($action['hook'], $action['function']))
 			{
 				if ($action['reverse'])
-					remove_integration_function($action['hook'], $action['function']);
+					remove_integration_function($action['hook'], $action['function'], $action['include_file']);
 				else
-					add_integration_function($action['hook'], $action['function']);
+					add_integration_function($action['hook'], $action['function'], $action['include_file']);
 			}
 			// Only do the database changes on uninstall if requested.
 			elseif ($action['type'] == 'database' && !empty($action['filename']) && (!$context['uninstalling'] || !empty($_POST['do_db_changes'])))
@@ -1107,6 +1119,13 @@ function PackageInstall()
 			{
 				// We're really just checking for entries which are create table AND add columns (etc).
 				$tables = array();
+				/**
+				 * Table sorting function used in usort
+				 *
+				 * @param type $a
+				 * @param type $b
+				 * @return int
+				 */
 				function sort_table_first($a, $b)
 				{
 					if ($a[0] == $b[0])
@@ -1356,10 +1375,10 @@ function PackageBrowse()
 
 	$context['page_title'] .= ' - ' . $txt['browse_packages'];
 
-	$context['forum_version'] = $forum_version;
-	$context['modification_types'] = array('modification', 'avatar', 'language', 'unknown');
-
 	$installed = $context['sub_action'] == 'installed' ? true : false;
+
+	$context['forum_version'] = $forum_version;
+	$context['modification_types'] = $installed ? array('modification') : array('modification', 'avatar', 'language', 'unknown');
 
 	require_once($sourcedir . '/Subs-List.php');
 
@@ -1374,23 +1393,28 @@ function PackageBrowse()
 				'function' => 'list_getPackages',
 				'params' => array('type' => $type, 'installed' => $installed),
 			),
+			'base_href' => $scripturl . '?action=admin;area=packages;sa=' . $context['sub_action'] . ';type=' . $type,
+			'default_sort_col' => 'id' . $type,
 			'columns' => array(
-				'id' => array(
+				'id' . $type => array(
 					'header' => array(
-						'value' => '',
-						'style' => 'width: 32px;',
+						'value' => $txt['package_id'],
+						'style' => 'width: 40px;',
 					),
 					'data' => array(
-						'function' => create_function('$packages', '
-							static $packageCounter;
-							if (empty($packageCounter))
-								$packageCounter = 1;
+						'function' => create_function('$package_md5', '
+							global $context;
 
-							return $packageCounter++ . \'.\';
+							if (isset($context[\'available_' . $type . '\'][$package_md5]))
+								return $context[\'available_' . $type . '\'][$package_md5][\'sort_id\'];
 						'),
 					),
+					'sort' => array(
+						'default' => 'sort_id',
+						'reverse' => 'sort_id'
+					),
 				),
-				'mod_name' => array(
+				'mod_name' . $type => array(
 					'header' => array(
 						'value' => $txt['mod_name'],
 						'style' => 'width: 25%;',
@@ -1400,11 +1424,15 @@ function PackageBrowse()
 							global $context;
 
 							if (isset($context[\'available_' . $type . '\'][$package_md5]))
-								return $context[\'available_' . $type . '\'][$package_md5][\'name\'];'
-						),
+								return $context[\'available_' . $type . '\'][$package_md5][\'name\'];
+						'),
+					),
+					'sort' => array(
+						'default' => 'name',
+						'reverse' => 'name',
 					),
 				),
-				'version' => array(
+				'version' . $type => array(
 					'header' => array(
 						'value' => $txt['mod_version'],
 						'style' => 'width: 25%;',
@@ -1414,11 +1442,15 @@ function PackageBrowse()
 							global $context;
 
 							if (isset($context[\'available_' . $type . '\'][$package_md5]))
-								return $context[\'available_' . $type . '\'][$package_md5][\'version\'];'
-						),
+								return $context[\'available_' . $type . '\'][$package_md5][\'version\'];
+						'),
+					),
+					'sort' => array(
+						'default' => 'version',
+						'reverse' => 'version',
 					),
 				),
-				'operations' => array(
+				'operations' . $type => array(
 					'header' => array(
 						'value' => '',
 					),
@@ -1451,9 +1483,9 @@ function PackageBrowse()
 
 							return $return . \'
 									<a href="\' . $scripturl . \'?action=admin;area=packages;sa=list;package=\' . $package[\'filename\'] . \'">[ \' . $txt[\'list_files\'] . \' ]</a>
-									<a href="\' . $scripturl . \'?action=admin;area=packages;sa=remove;package=\' . $package[\'filename\'] . \';\' . $context[\'session_var\'] . \'=\' . $context[\'session_id\'] . \'"\' . ($package[\'is_installed\'] && $package[\'is_current\'] ? \' onclick="return confirm(\\\'\' . $txt[\'package_delete_bad\'] . \'\\\');"\' : \'\') . \'>[ \' . $txt[\'package_delete\'] . \' ]</a>\';'
-							),
-						'style' => 'text-align: right;',
+									<a href="\' . $scripturl . \'?action=admin;area=packages;sa=remove;package=\' . $package[\'filename\'] . \';\' . $context[\'session_var\'] . \'=\' . $context[\'session_id\'] . \'"\' . ($package[\'is_installed\'] && $package[\'is_current\'] ? \' onclick="return confirm(\\\'\' . $txt[\'package_delete_bad\'] . \'\\\');"\' : \'\') . \'>[ \' . $txt[\'package_delete\'] . \' ]</a>\';
+						'),
+						'class' => 'righttext',
 					),
 				),
 			),
@@ -1480,11 +1512,23 @@ function PackageBrowse()
 	$context['available_all'] = array();
 }
 
+/**
+ * Get a listing of all the packages
+ * Determines if the package is a mod, avatar, language package
+ * Determines if the package has been installed or not
+ *
+ * @param type $start
+ * @param type $items_per_page
+ * @param type $sort
+ * @param type $params
+ * @param type $installed
+ * @return type
+ */
 function list_getPackages($start, $items_per_page, $sort, $params, $installed)
 {
 	global $boarddir, $scripturl, $context, $forum_version;
 	static $instmods, $packages;
-	
+
 	// Start things up
 	if (!isset($packages[$params]))
 		$packages[$params] = array();
@@ -1496,7 +1540,11 @@ function list_getPackages($start, $items_per_page, $sort, $params, $installed)
 	$the_version = strtr($forum_version, array('SMF ' => ''));
 
 	// Here we have a little code to help those who class themselves as something of gods, version emulation ;)
-	if (isset($_GET['version_emulate']))
+	if (isset($_GET['version_emulate']) && strtr($_GET['version_emulate'], array('SMF ' => '')) == $the_version)
+	{
+		unset($_SESSION['version_emulate']);
+	}
+	elseif (isset($_GET['version_emulate']))
 	{
 		if (($_GET['version_emulate'] === 0 || $_GET['version_emulate'] === $forum_version) && isset($_SESSION['version_emulate']))
 			unset($_SESSION['version_emulate']);
@@ -1528,10 +1576,11 @@ function list_getPackages($start, $items_per_page, $sort, $params, $installed)
 
 	if ($installed)
 	{
+		$sort_id = 1;
 		foreach ($instmods as $installed_mod)
 		{
-			$packages['modification'][] = $installed_mod['package_id'];
 			$context['available_modification'][$installed_mod['package_id']] = array(
+				'sort_id' => $sort_id++,
 				'can_uninstall' => true,
 				'name' => $installed_mod['name'],
 				'filename' => $installed_mod['filename'],
@@ -1541,15 +1590,22 @@ function list_getPackages($start, $items_per_page, $sort, $params, $installed)
 				'is_current' => true,
 			);
 		}
-		return $packages['modification'];
 	}
 
 	if (empty($packages))
-		$packages = array('modification' => array(), 'avatar' => array(), 'language' => array(), 'unknown' => array());
+		foreach ($context['modification_types'] as $type)
+			$packages[$type] = array();
 
 	if ($dir = @opendir($boarddir . '/Packages'))
 	{
 		$dirs = array();
+		$sort_id = array(
+			'mod' => 1,
+			'modification' => 1,
+			'avatar' => 1,
+			'language' => 1,
+			'unknown' => 1,
+		);
 		while ($package = readdir($dir))
 		{
 			if ($package == '.' || $package == '..' || $package == 'temp' || (!(is_dir($boarddir . '/Packages/' . $package) && file_exists($boarddir . '/Packages/' . $package . '/package-info.xml')) && substr(strtolower($package), -7) != '.tar.gz' && substr(strtolower($package), -4) != '.tgz' && substr(strtolower($package), -4) != '.zip'))
@@ -1591,6 +1647,7 @@ function list_getPackages($start, $items_per_page, $sort, $params, $installed)
 			{
 				$packageInfo['installed_id'] = isset($installed_mods[$packageInfo['id']]) ? $installed_mods[$packageInfo['id']]['id'] : 0;
 
+				$packageInfo['sort_id'] = $sort_id[$packageInfo['type']];
 				$packageInfo['is_installed'] = isset($installed_mods[$packageInfo['id']]);
 				$packageInfo['is_current'] = $packageInfo['is_installed'] && ($installed_mods[$packageInfo['id']]['version'] == $packageInfo['version']);
 				$packageInfo['is_newer'] = $packageInfo['is_installed'] && ($installed_mods[$packageInfo['id']]['version'] > $packageInfo['version']);
@@ -1620,7 +1677,7 @@ function list_getPackages($start, $items_per_page, $sort, $params, $installed)
 					if ($packageInfo['can_install'] === false && $install->exists('@for') && empty($_SESSION['version_emulate']))
 					{
 						$reset = true;
-						
+
 						// Get the highest install version that is available from the package
 						foreach ($installs as $install)
 						{
@@ -1660,12 +1717,12 @@ function list_getPackages($start, $items_per_page, $sort, $params, $installed)
 							break;
 						}
 					}
-					
+
 					// no uninstall found for this version, lets see if one exists for another
 					if ($packageInfo['can_uninstall'] === false && $uninstall->exists('@for') && empty($_SESSION['version_emulate']))
 					{
 						$reset = true;
-						
+
 						// Get the highest install version that is available from the package
 						foreach ($uninstalls as $uninstall)
 						{
@@ -1678,34 +1735,62 @@ function list_getPackages($start, $items_per_page, $sort, $params, $installed)
 				// Modification.
 				if ($packageInfo['type'] == 'modification' || $packageInfo['type'] == 'mod')
 				{
-					$packages['modification'][] = md5($package);
-					$context['available_modification'][md5($package)] = $packageInfo;
+					$sort_id['modification']++;
+					$sort_id['mod']++;
+					if ($installed)
+					{
+						if (!empty($context['available_modification'][$packageInfo['id']]))
+						{
+							$packages['modification'][strtolower($packageInfo[$sort]) . '_' . $sort_id['mod']] = $packageInfo['id'];
+							$context['available_modification'][$packageInfo['id']] = array_merge($context['available_modification'][$packageInfo['id']], $packageInfo);
+						}
+					}
+					else
+					{
+						$packages['modification'][strtolower($packageInfo[$sort]) .  '_' . $sort_id['mod']] = md5($package);
+						$context['available_modification'][md5($package)] = $packageInfo;
+					}
 				}
 				// Avatar package.
 				elseif ($packageInfo['type'] == 'avatar')
 				{
-					$packages['avatar'][] = md5($package);
+					$sort_id[$packageInfo['type']]++;
+					$packages['avatar'][strtolower($packageInfo[$sort])] = md5($package);
 					$context['available_avatar'][md5($package)] = $packageInfo;
 				}
 				// Language package.
 				elseif ($packageInfo['type'] == 'language')
 				{
-					$packages['language'][] = md5($package);
+					$sort_id[$packageInfo['type']]++;
+					$packages['language'][strtolower($packageInfo[$sort])] = md5($package);
 					$context['available_language'][md5($package)] = $packageInfo;
 				}
 				// Other stuff.
 				else
 				{
-					$packages['unknown'][] = md5($package);
+					$sort_id['unknown']++;
+					$packages['unknown'][strtolower($packageInfo[$sort])] = md5($package);
 					$context['available_unknown'][md5($package)] = $packageInfo;
 				}
 			}
 		}
 		closedir($dir);
 	}
+
+	if (isset($_GET['type']) && $_GET['type'] == $params)
+	{
+		if (isset($_GET['desc']))
+			krsort($packages[$params]);
+		else
+			ksort($packages[$params]);
+	}
+
 	return $packages[$params];
 }
 
+/**
+ * Used when a temp FTP access is needed to package functions
+ */
 function PackageOptions()
 {
 	global $txt, $scripturl, $context, $sourcedir, $modSettings, $smcFunc;
@@ -2171,6 +2256,14 @@ function PackagePermissions()
 	}
 }
 
+/**
+ * Checkes the permissions of all the areas that will be affected by the package
+ *
+ * @param type $path
+ * @param type $data
+ * @param type $level
+ * @return type
+ */
 function fetchPerms__recursive($path, &$data, $level)
 {
 	global $context;
@@ -2450,6 +2543,12 @@ function PackagePermissionsAction()
 		// Haven't counted the items yet?
 		if (empty($context['total_items']))
 		{
+			/**
+			 * Counts all the directorys under a given path
+			 *
+			 * @param type $dir
+			 * @return integer
+			 */
 			function count_directories__recursive($dir)
 			{
 				global $context;
@@ -2485,6 +2584,13 @@ function PackagePermissionsAction()
 		if (!isset($_POST['specialFiles']) && $context['predefined_type'] != 'free')
 		{
 			$context['special_files'] = array();
+
+			/**
+			 * Builds a list of special files recusivly for a given path
+			 *
+			 * @param type $path
+			 * @param type $data
+			 */
 			function build_special_files__recursive($path, &$data)
 			{
 				global $context;

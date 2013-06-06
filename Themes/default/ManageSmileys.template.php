@@ -4,7 +4,7 @@
  *
  * @package SMF
  * @author Simple Machines
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
@@ -26,18 +26,15 @@ function template_editsets()
 			<h3 class="catbg">', $txt['smiley_sets_latest'], '</h3>
 		</div>
 		<div class="windowbg">
-			<span class="topslice"><span></span></span>
 			<div class="content">
 				<div id="smileysLatest">', $txt['smiley_sets_latest_fetch'], '</div>
 			</div>
-			<span class="botslice"><span></span></span>
 		</div>
 	</div>
-	<br class="clear" />
 	<script type="text/javascript"><!-- // --><![CDATA[
-		window.smfForum_scripturl = "', $scripturl, '";
-		window.smfForum_sessionid = "', $context['session_id'], '";
-		window.smfForum_sessionvar = "', $context['session_var'], '";
+		window.smfForum_scripturl = smf_scripturl;
+		window.smfForum_sessionid = smf_session_id;
+		window.smfForum_sessionvar = smf_session_var;
 	// ]]></script>';
 
 	if (empty($modSettings['disable_smf_js']))
@@ -88,13 +85,12 @@ function template_modifyset()
 		{
 			echo '
 			<div class="information">
-				', $context['current_set']['can_import'] == 1 ? $txt['smiley_set_import_single'] : $txt['smiley_set_import_multiple'], ' <a href="', $scripturl, '?action=admin;area=smileys;sa=import;set=', $context['current_set']['id'], ';', $context['session_var'], '=', $context['session_id'], '">', $txt['here'], '</a> ', $context['current_set']['can_import'] == 1 ? $txt['smiley_set_to_import_single'] : $txt['smiley_set_to_import_multiple'], '
+				', $context['current_set']['can_import'] == 1 ? sprintf($txt['smiley_set_import_single'], $context['current_set']['import_url']) : sprintf($txt['smiley_set_import_multiple'], $context['current_set']['can_import'], $context['current_set']['import_url']), '
 			</div>';
 		}
 
 		echo '
 			<div class="windowbg">
-				<span class="topslice"><span></span></span>
 				<div class="content">
 					<dl class="settings">
 						<dt>
@@ -146,17 +142,14 @@ function template_modifyset()
 		echo '
 					</dl>
 					<hr class="hrcolor" />
-					<input type="submit" value="', $txt['smiley_sets_save'], '" class="button_submit" />
-					<br class="clear_right" />
+					<input type="submit" name="smiley_save" value="', $txt['smiley_sets_save'], '" class="button_submit" />
 				</div>
-				<span class="botslice"><span></span></span>
 			</div>
 			<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
 			<input type="hidden" name="', $context['admin-mss_token_var'], '" value="', $context['admin-mss_token'], '" />
 			<input type="hidden" name="set" value="', $context['current_set']['id'], '" />
 		</form>
-	</div>
-	<br class="clear" />';
+	</div>';
 }
 
 // Editing an individual smiley
@@ -171,7 +164,6 @@ function template_modifysmiley()
 				<h3 class="catbg">', $txt['smiley_modify_existing'], '</h3>
 			</div>
 			<div class="windowbg">
-				<span class="topslice"><span></span></span>
 				<div class="content">
 					<dl class="settings">
 						<dt>
@@ -238,15 +230,12 @@ function template_modifysmiley()
 					<hr class="hrcolor" />
 					<input type="submit" name="smiley_save" value="', $txt['smileys_save'], '" class="button_submit" />
 					<input type="submit" name="deletesmiley" value="', $txt['smileys_delete'], '" onclick="return confirm(\'', $txt['smileys_delete_confirm'], '\');" class="button_submit" />
-					<br class="clear_right" />
 				</div>
-				<span class="botslice"><span></span></span>
 			</div>
 			<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
 			<input type="hidden" name="smiley" value="', $context['current_smiley']['id'], '" />
 		</form>
 	</div>
-	<br class="clear" />
 	<script type="text/javascript"><!-- // --><![CDATA[
 		function updatePreview()
 		{
@@ -268,7 +257,6 @@ function template_addsmiley()
 				<h3 class="catbg">', $txt['smileys_add_method'], '</h3>
 			</div>
 			<div class="windowbg">
-				<span class="topslice"><span></span></span>
 				<div class="content">
 					<ul class="reset">
 						<li>
@@ -348,14 +336,11 @@ function template_addsmiley()
 	echo '
 					</dl>
 				</div>
-				<span class="botslice"><span></span></span>
 			</div>
-			<br class="clear" />
 			<div class="cat_bar">
 				<h3 class="catbg">', $txt['smiley_new'], '</h3>
 			</div>
 			<div class="windowbg">
-				<span class="topslice"><span></span></span>
 				<div class="content">
 					<dl class="settings">
 						<dt>
@@ -389,14 +374,11 @@ function template_addsmiley()
 					</dl>
 					<hr class="hrcolor" />
 					<input type="submit" name="smiley_save" value="', $txt['smileys_save'], '" class="button_submit" />
-					<br class="clear_right" />
 				</div>
-				<span class="botslice"><span></span></span>
 			</div>
 			<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
 		</form>
-	</div>
-	<br class="clear" />';
+	</div>';
 }
 
 // Ordering smileys.
@@ -418,7 +400,6 @@ function template_setorder()
 				', $location['description'], '
 			</div>
 			<div class="windowbg">
-				<span class="topslice"><span></span></span>
 				<div class="content">
 					<strong>', empty($context['move_smiley']) ? $txt['smileys_move_select_smiley'] : $txt['smileys_move_select_destination'], '...</strong><br />';
 		foreach ($location['rows'] as $row)
@@ -443,15 +424,13 @@ function template_setorder()
 					<a href="', $scripturl, '?action=admin;area=smileys;sa=setorder;location=', $location['id'], ';source=', $context['move_smiley'], ';row=', $location['last_row'], ';reorder=1;', $context['session_var'], '=', $context['session_id'], '"><img src="', $settings['images_url'], '/smiley_select_spot.png" alt="', $txt['smileys_move_here'], '" /></a>';
 		echo '
 				</div>
-				<span class="botslice"><span></span></span>
 			</div>
 		<input type="hidden" name="reorder" value="1" />
-	</form>
-	<br />';
+	</form>';
 	}
+
 	echo '
-	</div>
-	<br class="clear" />';
+	</div>';
 }
 
 // Editing Message Icons
@@ -476,7 +455,6 @@ function template_editicon()
 				</h3>
 			</div>
 			<div class="windowbg">
-				<span class="topslice"><span></span></span>
 				<div class="content">
 					<dl class="settings">';
 	if (!$context['new_icon'])
@@ -546,13 +524,10 @@ function template_editicon()
 					<hr class="hrcolor" />
 					<input type="submit" name="icons_save" value="', $txt['smileys_save'], '" class="button_submit" />
 					<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
-					<br class="clear_right" />
 				</div>
-				<span class="botslice"><span></span></span>
 			</div>
 		</form>
-	</div>
-	<br class="clear" />';
+	</div>';
 }
 
 ?>

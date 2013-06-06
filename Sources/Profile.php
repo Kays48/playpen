@@ -9,14 +9,14 @@
  *
  * @package SMF
  * @author Simple Machines http://www.simplemachines.org
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
  */
 
 if (!defined('SMF'))
-	die('Hacking attempt...');
+	die('No direct access...');
 
 /**
  * Allow the change or view of profiles...
@@ -30,7 +30,7 @@ function ModifyProfile($post_errors = array())
 
 	// Don't reload this as we may have processed error strings.
 	if (empty($post_errors))
-		loadLanguage('Profile');
+		loadLanguage('Profile+Drafts');
 	loadTemplate('Profile');
 
 	require_once($sourcedir . '/Subs-Menu.php');
@@ -109,11 +109,22 @@ function ModifyProfile($post_errors = array())
 					'subsections' => array(
 						'messages' => array($txt['showMessages'], array('profile_view_own', 'profile_view_any')),
 						'topics' => array($txt['showTopics'], array('profile_view_own', 'profile_view_any')),
+						'disregardedtopics' => array($txt['showDisregarded'], array('profile_view_own', 'profile_view_any'), 'enabled' => $modSettings['enable_disregard'] && $context['user']['is_owner']),
 						'attach' => array($txt['showAttachments'], array('profile_view_own', 'profile_view_any')),
 					),
 					'permission' => array(
 						'own' => 'profile_view_own',
 						'any' => 'profile_view_any',
+					),
+				),
+				'showdrafts' => array(
+					'label' => $txt['drafts_show'],
+					'file' => 'Drafts.php',
+					'function' => 'showProfileDrafts',
+					'enabled' => !empty($modSettings['drafts_enabled']) && $context['user']['is_owner'],
+					'permission' => array(
+						'own' => 'profile_view_own',
+						'any' =>  array(),
 					),
 				),
 				'permissions' => array(
@@ -449,12 +460,12 @@ function ModifyProfile($post_errors = array())
 	unset($profile_areas);
 
 	// Now the context is setup have we got any security checks to carry out additional to that above?
+	if (isset($security_checks['validateToken']))
+		validateToken($token_name, $token_type);
 	if (isset($security_checks['session']))
 		checkSession($security_checks['session']);
 	if (isset($security_checks['validate']))
 		validateSession();
-	if (isset($security_checks['validateToken']))
-		validateToken($token_name, $token_type);
 	if (isset($security_checks['permission']))
 		isAllowedTo($security_checks['permission']);
 
@@ -561,7 +572,7 @@ function ModifyProfile($post_errors = array())
 		{
 			if (empty($post_errors))
 			{
-				deleteAccount2($profile_vars, $post_errors, $memID);
+				deleteAccount2($memID);
 				redirectexit();
 			}
 		}
@@ -586,6 +597,8 @@ function ModifyProfile($post_errors = array())
 			require_once($sourcedir . '/Profile-Modify.php');
 			saveProfileChanges($profile_vars, $post_errors, $memID);
 		}
+
+		call_integration_hook('integrate_profile_save', array(&$profile_vars, &$post_errors, $memID));
 
 		// There was a problem, let them try to re-enter.
 		if (!empty($post_errors))
@@ -620,7 +633,16 @@ function ModifyProfile($post_errors = array())
 				$log_changes = array();
 				require_once($sourcedir . '/Logging.php');
 				foreach ($context['log_changes'] as $k => $v)
-					logAction($k, array_merge($v, array('applicator' => $user_info['id'], 'member_affected' => $memID)), 'user');
+					$log_changes[] = array(
+						'action' => $k,
+						'log_type' => 'user',
+						'extra' => array_merge($v, array(
+							'applicator' => $user_info['id'],
+							'member_affected' => $memID,
+						)),
+					);
+
+				logActions($log_changes);
 			}
 
 			// Have we got any post save functions to execute?
@@ -686,7 +708,7 @@ function loadCustomFields($memID, $area = 'summary')
 	// Load all the relevant fields - and data.
 	$request = $smcFunc['db_query']('', '
 		SELECT
-			col_name, field_name, field_desc, field_type, field_length, field_options,
+			col_name, field_name, field_desc, field_type, show_reg, field_length, field_options,
 			default_value, bbc, enclose, placement
 		FROM {db_prefix}custom_fields
 		WHERE ' . $where,
@@ -695,6 +717,7 @@ function loadCustomFields($memID, $area = 'summary')
 		)
 	);
 	$context['custom_fields'] = array();
+	$context['custom_fields_required'] = false;
 	while ($row = $smcFunc['db_fetch_assoc']($request))
 	{
 		// Shortcut.
@@ -757,7 +780,7 @@ function loadCustomFields($memID, $area = 'summary')
 		// Parse BBCode
 		if ($row['bbc'])
 			$output_html = parse_bbc($output_html);
-		elseif($row['field_type'] == 'textarea')
+		elseif ($row['field_type'] == 'textarea')
 			// Allow for newlines at least
 			$output_html = strtr($output_html, array("\n" => '<br />'));
 
@@ -779,9 +802,13 @@ function loadCustomFields($memID, $area = 'summary')
 			'placement' => $row['placement'],
 			'colname' => $row['col_name'],
 			'value' => $value,
+			'show_reg' => $row['show_reg'],
 		);
+		$context['custom_fields_required'] = $context['custom_fields_required'] || $row['show_reg'];
 	}
 	$smcFunc['db_free_result']($request);
+
+	call_integration_hook('integrate_load_custom_profile_fields', array($memID, $area));
 }
 
 ?>

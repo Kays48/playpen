@@ -12,14 +12,14 @@
  *
  * @package SMF
  * @author Simple Machines http://www.simplemachines.org
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
  */
 
 if (!defined('SMF'))
-	die('Hacking attempt...');
+	die('No direct access...');
 
 /**
  * downloads a file from a url and stores it locally for avatar use by id_member.
@@ -29,11 +29,11 @@ if (!defined('SMF'))
  * - updates the database info for the member's avatar.
  * - returns whether the download and resize was successful.
  *
- * @param string $temporary_path, the full path to the temporary file
- * @param int $memID, member ID
+ * @param string $url the full path to the temporary file
+ * @param int $memID member ID
  * @param int $max_width
  * @param int $max_height
- * @return bool, whether the download and resize was successful.
+ * @return boolean whether the download and resize was successful.
  *
  */
 function downloadAvatar($url, $memID, $max_width, $max_height)
@@ -65,7 +65,7 @@ function downloadAvatar($url, $memID, $max_width, $max_height)
 		array('id_attach')
 	);
 	$attachID = $smcFunc['db_insert_id']('{db_prefix}attachments', 'id_attach');
-	
+
 	// Retain this globally in case the script wants it.
 	$modSettings['new_avatar_data'] = array(
 		'id' => $attachID,
@@ -140,7 +140,7 @@ function downloadAvatar($url, $memID, $max_width, $max_height)
  * @param string $source
  * @param int $max_width
  * @param int $max_height
- * @return bool, whether the thumbnail creation was successful.
+ * @return boolean, whether the thumbnail creation was successful.
  */
 function createThumbnail($source, $max_width, $max_height)
 {
@@ -175,7 +175,7 @@ function createThumbnail($source, $max_width, $max_height)
  *
  * @param string $fileName
  * @param int $preferred_format = 0
- * @return bool, true on success, false on failure.
+ * @return boolean, true on success, false on failure.
  */
 function reencodeImage($fileName, $preferred_format = 0)
 {
@@ -272,12 +272,13 @@ function checkImagick()
 /**
  * See if we have enough memory to thumbnail an image
  *
+ * @param array $sizes image size
  * @return whether we do
  */
 function imageMemoryCheck($sizes)
 {
 	global $modSettings;
-	
+
 	// doing the old 'set it and hope' way?
 	if (empty($modSettings['attachment_thumb_memory']))
 	{
@@ -286,10 +287,10 @@ function imageMemoryCheck($sizes)
 	}
 
 	// Determine the memory requirements for this image, note: if you want to use an image formula W x H x bits/8 x channels x Overhead factor
-	// you will need to account for single bit images as GD expands them to an 8 bit and will greatly overun the calculated value.  The 5 is 
+	// you will need to account for single bit images as GD expands them to an 8 bit and will greatly overun the calculated value.  The 5 is
 	// simply a shortcut of 8bpp, 3 channels, 1.66 overhead
 	$needed_memory = ($sizes[0] * $sizes[1] * 5);
-	
+
 	// if we need more, lets try to get it
 	return setMemoryLimit($needed_memory, true);
 }
@@ -354,7 +355,7 @@ function resizeImageFile($source, $destination, $max_width, $max_height, $prefer
 	// We can't get to the file.
 	else
 		$sizes = array(-1, -1, -1);
-		
+
 	// See if we have -or- can get the needed memory for this operation
 	if (checkGD() && !imageMemoryCheck($sizes))
 		return false;
@@ -705,7 +706,7 @@ if (!function_exists('imagecreatefrombmp'))
 				for ($j = 0; $j < $scan_line_size; $x++)
 				{
 					$byte = ord($scan_line{$j++});
-					
+
 					imagesetpixel($dst_img, $x, $y, $palette[(($byte) & 128) != 0]);
 					for ($shift = 1; $shift < 8; $shift++) {
 						if (++$x < $info['width']) imagesetpixel($dst_img, $x, $y, $palette[(($byte << $shift) & 128) != 0]);
@@ -728,7 +729,7 @@ if (!function_exists('imagecreatefrombmp'))
  * @param resource $gif
  * @param string $lpszFileName
  * @param int $background_color = -1
- * @return bool, whether it was successful or not.
+ * @return boolean, whether it was successful or not.
  */
 function gif_outputAsPng($gif, $lpszFileName, $background_color = -1)
 {

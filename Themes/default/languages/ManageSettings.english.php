@@ -1,5 +1,5 @@
 <?php
-// Version: 2.0; ManageSettings
+// Version: 2.1; ManageSettings
 
 global $scripturl;
 
@@ -20,9 +20,9 @@ $txt['allow_hideOnline'] = 'Allow non-administrators to hide their online status
 $txt['guest_hideContacts'] = 'Do not reveal contact details of members to guests';
 $txt['titlesEnable'] = 'Enable custom titles';
 $txt['enable_buddylist'] = 'Enable buddy/ignore lists';
+$txt['enable_disregard'] = 'Enable disregard topics';
 $txt['default_personal_text'] = 'Default personal text';
 $txt['default_personal_text_note'] = 'Personal text to assign to newly registered members.';
-$txt['number_format'] = 'Default number format';
 $txt['time_format'] = 'Default time format';
 $txt['setting_time_offset'] = 'Overall time offset';
 $txt['setting_time_offset_note'] = '(added to the member specific option)';
@@ -66,12 +66,12 @@ $txt['autoOptMaxOnline'] = 'Maximum users online when optimizing';
 $txt['autoFixDatabase'] = 'Automatically fix broken tables';
 $txt['allow_disableAnnounce'] = 'Allow users to disable announcements';
 $txt['disallow_sendBody'] = 'Don\'t allow post text in notifications';
-$txt['jquery_source'] = 'Source for the Jquery Library';
+$txt['jquery_source'] = 'Source for the jQuery Library';
 $txt['jquery_local'] = 'Local';
 $txt['jquery_cdn'] = 'Google CDN';
 $txt['jquery_auto'] = 'Auto';
 $txt['queryless_urls'] = 'Search engine friendly URLs';
-$txt['queryless_urls_note'] = 'Apache/Lighttpd only!';
+$txt['queryless_urls_note'] = 'Apache/Lighttpd only';
 $txt['enableReportPM'] = 'Enable reporting of personal messages';
 $txt['max_pm_recipients'] = 'Maximum number of recipients allowed in a personal message';
 $txt['max_pm_recipients_note'] = '(0 for no limit, admins are exempt)';
@@ -108,8 +108,7 @@ $txt['karmaLabel'] = 'Karma label';
 $txt['karmaApplaudLabel'] = 'Karma applaud label';
 $txt['karmaSmiteLabel'] = 'Karma smite label';
 
-$txt['caching_information'] = '<div class="aligncenter underline"><strong>Important! Read this first before enabling these features.</strong></div>
-SMF supports caching through the use of accelerators. The currently supported accelerators include:
+$txt['caching_information'] = 'SMF supports caching through the use of accelerators. The currently supported accelerators include:
 <ul class="normallist">
 	<li>APC</li>
 	<li>eAccelerator</li>
@@ -155,6 +154,7 @@ $txt['setting_password_strength'] = 'Required strength for user passwords';
 $txt['setting_password_strength_low'] = 'Low - 4 character minimum';
 $txt['setting_password_strength_medium'] = 'Medium - cannot contain username';
 $txt['setting_password_strength_high'] = 'High - mixture of different characters';
+$txt['setting_enable_password_conversion'] = 'Allow password hash conversion';
 
 $txt['antispam_Settings'] = 'Anti-Spam Verification';
 $txt['antispam_Settings_desc'] = 'This section allows you to setup verification checks to ensure the user is a human (and not a bot), and tweak how and where these apply.';
@@ -206,7 +206,8 @@ $txt['setting_warning_show_all'] = 'All Users';
 
 $txt['signature_settings'] = 'Signature Settings';
 $txt['signature_settings_desc'] = 'Use the settings on this page to decide how member signatures should be treated in SMF.';
-$txt['signature_settings_warning'] = 'Note that settings are not applied to existing signatures by default. Click <a href="' . $scripturl . '?action=admin;area=featuresettings;sa=sig;apply;%2$s=%1$s">here</a> to apply rules to all existing signatures.';
+$txt['signature_settings_warning'] = 'Note that settings are not applied to existing signatures by default. <a href="' . $scripturl . '?action=admin;area=featuresettings;sa=sig;apply;%2$s=%1$s">Run the process now</a>';
+$txt['signature_settings_applied'] = 'The updated rules have been applied to the existing signatures.';
 $txt['signature_enable'] = 'Enable signatures';
 $txt['signature_max_length'] = 'Maximum allowed characters';
 $txt['signature_max_lines'] = 'Maximum amount of lines';
@@ -299,8 +300,12 @@ $txt['core_settings_welcome_msg'] = 'Welcome to Your New Forum';
 $txt['core_settings_welcome_msg_desc'] = 'To get you started we suggest you select which of SMF\'s core features you want to enable. We\'d recommend only enabling with those features you need!';
 $txt['core_settings_item_cd'] = 'Calendar';
 $txt['core_settings_item_cd_desc'] = 'Enabling this feature will open up a selection of options to enable your users to view the calendar, add and review events, see users birthdates on a calendar and much, much more.';
+$txt['core_settings_item_dr'] = 'Drafts';
+$txt['core_settings_item_dr_desc'] = 'Enabling this feature will allow users to save drafts of their posts so they can return to them later to post them.';
 $txt['core_settings_item_cp'] = 'Advanced Profile Fields';
 $txt['core_settings_item_cp_desc'] = 'This enables you to hide standard profile fields, add profile fields to registration, and create new profile fields for your forum.';
+$txt['core_settings_item_ih'] = 'Integration Hooks Management';
+$txt['core_settings_item_ih_desc'] = 'This feature allows you to enable or disable any integration hooks added by modifications. Changing hooks can prevent your forum from working properly, so use this feature only if you know what you are doing.';
 $txt['core_settings_item_k'] = 'Karma';
 $txt['core_settings_item_k_desc'] = 'Karma is a feature that shows the popularity of a member. Members, if allowed, can \'applaud\' or \'smite\' other members, which is how their popularity is calculated.';
 $txt['core_settings_item_ml'] = 'Moderation, Administration and User Logs';
@@ -310,11 +315,11 @@ $txt['core_settings_item_pm_desc'] = 'Post moderation enables you to select grou
 $txt['core_settings_item_ps'] = 'Paid Subscriptions';
 $txt['core_settings_item_ps_desc'] = 'Paid subscriptions allow users to pay for subscriptions to change membergroup within the forum and thus change their access rights.';
 $txt['core_settings_item_rg'] = 'Report Generation';
-$txt['core_settings_item_rg_desc'] = 'This administration feature allows the generation of reports (Which can be printed) to present your current forum setup in an easy to view manner - particularly useful for large forums.';
+$txt['core_settings_item_rg_desc'] = 'This administration feature allows the generation of reports (which can be printed) to present your current forum setup in an easy to view manner - particularly useful for large forums.';
 $txt['core_settings_item_sp'] = 'Search Engine Tracking';
 $txt['core_settings_item_sp_desc'] = 'Enabling this feature will allow administrators to track search engines as they index your forum.';
 $txt['core_settings_item_w'] = 'Warning System';
-$txt['core_settings_item_w_desc'] = 'This functionality allows administrators and moderators to issue warnings to users; it also includes advanced functionality for automatically removing user rights as their warning level increases. Note to take full advantage of this function &quot;Post Moderation&quot; should be enabled.';
+$txt['core_settings_item_w_desc'] = 'This system allows administrators and moderators to issue warnings to users, and can automatically remove user rights as their warning level increases. To take full advantage of this system, &quot;Post Moderation&quot; should be enabled.';
 $txt['core_settings_switch_on'] = 'Click to Enable';
 $txt['core_settings_switch_off'] = 'Click to Disable';
 $txt['core_settings_enabled'] = 'Enabled';
@@ -378,5 +383,10 @@ $txt['languages_download_illegal_paths'] = 'Package contains illegal paths - ple
 $txt['languages_download_complete'] = 'Installation Complete';
 $txt['languages_download_complete_desc'] = 'Language pack installed successfully. Please click <a href="%1$s">here</a> to return to the languages page';
 $txt['languages_delete_confirm'] = 'Are you sure you want to delete this language?';
+
+$txt['setting_frame_security'] = 'Frame Security Options';
+$txt['setting_frame_security_SAMEORIGIN'] = 'Allow Same Origin';
+$txt['setting_frame_security_DENY'] = 'Deny all frames';
+$txt['setting_frame_security_DISABLE'] = 'Disabled';
 
 ?>

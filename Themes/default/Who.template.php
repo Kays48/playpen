@@ -4,7 +4,7 @@
  *
  * @package SMF
  * @author Simple Machines
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
@@ -24,9 +24,9 @@ function template_main()
 			</div>
 			<div class="topic_table" id="mlist">
 				<div class="pagesection">
-					<div class="pagelinks floatleft">', $txt['pages'], ': ', $context['page_index'], '</div>';
+					<div class="pagelinks floatleft">', $context['page_index'], '</div>';
 		echo '
-					<div class="selectbox floatright">', $txt['who_show1'], '
+					<div class="selectbox floatright" id="upper_show">', $txt['who_show1'], '
 						<select name="show_top" onchange="document.forms.whoFilter.show.value = this.value; document.forms.whoFilter.submit();">';
 
 		foreach ($context['show_methods'] as $value => $label)
@@ -59,13 +59,13 @@ function template_main()
 						<tr class="windowbg', $alternate ? '2' : '', '">
 							<td>';
 
-		// Guests don't have information like icq, msn, y!, and aim... and they can't be messaged.
+		// Guests don't have information like icq, skype, y!, and aim... and they can't be messaged.
 		if (!$member['is_guest'])
 		{
 			echo '
 								<span class="contact_info floatright">
-									', $context['can_send_pm'] ? '<a href="' . $member['online']['href'] . '" title="' . $member['online']['label'] . '">' : '', $settings['use_image_buttons'] ? '<img src="' . $member['online']['image_href'] . '" alt="' . $member['online']['text'] . '" align="bottom" />' : $member['online']['text'], $context['can_send_pm'] ? '</a>' : '', '
-									', isset($context['disabled_fields']['icq']) ? '' : $member['icq']['link'] , ' ', isset($context['disabled_fields']['msn']) ? '' : $member['msn']['link'], ' ', isset($context['disabled_fields']['yim']) ? '' : $member['yim']['link'], ' ', isset($context['disabled_fields']['aim']) ? '' : $member['aim']['link'], '
+									', $context['can_send_pm'] ? '<a href="' . $member['online']['href'] . '" title="' . $member['online']['text'] . '">' : '', $settings['use_image_buttons'] ? '<img src="' . $member['online']['image_href'] . '" alt="' . $member['online']['text'] . '" align="bottom" />' : $member['online']['label'], $context['can_send_pm'] ? '</a>' : '', '
+									', isset($context['disabled_fields']['icq']) ? '' : $member['icq']['link'] , ' ', isset($context['disabled_fields']['skype']) ? '' : $member['skype']['link'], ' ', isset($context['disabled_fields']['yim']) ? '' : $member['yim']['link'], ' ', isset($context['disabled_fields']['aim']) ? '' : $member['aim']['link'], '
 								</span>';
 		}
 
@@ -102,22 +102,22 @@ function template_main()
 	echo '
 					</tbody>
 				</table>
-			</div>
-			<div class="pagesection">
-				<div class="pagelinks floatleft">', $txt['pages'], ': ', $context['page_index'], '</div>';
-
-	echo '
-				<div class="selectbox floatright">', $txt['who_show1'], '
-					<select name="show" onchange="document.forms.whoFilter.submit();">';
-
-	foreach ($context['show_methods'] as $value => $label)
+				<div class="pagesection" id="lower_pagesection">
+					<div class="pagelinks floatleft" id="lower_pagelinks">', $context['page_index'], '</div>';
+	
 		echo '
-						<option value="', $value, '" ', $value == $context['show_by'] ? ' selected="selected"' : '', '>', $label, '</option>';
-	echo '
-					</select>
-					<noscript>
-						<input type="submit" value="', $txt['go'], '" class="button_submit" />
-					</noscript>
+					<div class="selectbox floatright">', $txt['who_show1'], '
+						<select name="show" onchange="document.forms.whoFilter.submit();">';
+	
+		foreach ($context['show_methods'] as $value => $label)
+			echo '
+							<option value="', $value, '" ', $value == $context['show_by'] ? ' selected="selected"' : '', '>', $label, '</option>';
+		echo '
+						</select>
+						<noscript>
+							<input type="submit" value="', $txt['go'], '" class="button_submit" />
+						</noscript>
+					</div>
 				</div>
 			</div>
 		</form>
@@ -140,11 +140,9 @@ function template_credits()
 		if (isset($section['pretext']))
 		echo '
 		<div class="windowbg">
-			<span class="topslice"><span></span></span>
 			<div class="content">
 				<p>', $section['pretext'], '</p>
 			</div>
-			<span class="botslice"><span></span></span>
 		</div>';
 
 		if (isset($section['title']))
@@ -155,7 +153,6 @@ function template_credits()
 
 		echo '
 		<div class="windowbg2">
-			<span class="topslice"><span></span></span>
 			<div class="content">
 				<dl>';
 
@@ -190,10 +187,9 @@ function template_credits()
 
 		echo '
 			</div>
-			<span class="botslice"><span></span></span>
 		</div>';
 	}
-	
+
 	// Other software and graphics
 	if (!empty($context['credits_software_graphics']))
 	{
@@ -202,29 +198,27 @@ function template_credits()
 			<h3 class="catbg">', $txt['credits_software_graphics'], '</h3>
 		</div>
 		<div class="windowbg">
-			<span class="topslice"><span></span></span>
 			<div class="content">';
-		
+
 		if (!empty($context['credits_software_graphics']['graphics']))
 			echo '
 				<dl>
 					<dt><strong>', $txt['credits_graphics'], '</strong></dt>
 					<dd>', implode('</dd><dd>', $context['credits_software_graphics']['graphics']), '</dd>
 				</dl>';
-		
+
 		if (!empty($context['credits_software_graphics']['software']))
 			echo '
 				<dl>
 					<dt><strong>', $txt['credits_software'], '</strong></dt>
 					<dd>', implode('</dd><dd>', $context['credits_software_graphics']['software']), '</dd>
 				</dl>';
-	
+
 		echo '
 			</div>
-			<span class="botslice"><span></span></span>
 		</div>';
 	}
-	
+
 	// How about Modifications, we all love em
 	if (!empty($context['credits_modifications']))
 	{
@@ -233,18 +227,16 @@ function template_credits()
 			<h3 class="catbg">', $txt['credits_modifications'], '</h3>
 		</div>
 		<div class="windowbg">
-			<span class="topslice"><span></span></span>
 			<div class="content">';
-				
+
 		echo '
 				<dl>
 					<dt><strong>', $txt['credits_modifications'], '</strong></dt>
 					<dd>', implode('</dd><dd>', $context['credits_modifications']), '</dd>
 				</dl>';
-		
+
 		echo '
 			</div>
-			<span class="botslice"><span></span></span>
 		</div>';
 	}
 
@@ -254,7 +246,6 @@ function template_credits()
 			<h3 class="catbg">', $txt['credits_copyright'], '</h3>
 		</div>
 		<div class="windowbg">
-			<span class="topslice"><span></span></span>
 			<div class="content">
 				<dl>
 					<dt><strong>', $txt['credits_forum'], '</strong></dt>', '
@@ -263,7 +254,7 @@ function template_credits()
 	echo '
 					</dd>
 				</dl>';
-				
+
 	if (!empty($context['copyrights']['mods']))
 	{
 		echo '
@@ -275,7 +266,6 @@ function template_credits()
 
 	echo '
 			</div>
-			<span class="botslice"><span></span></span>
 		</div>
 	</div>';
 }

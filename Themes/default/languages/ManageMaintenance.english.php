@@ -1,5 +1,5 @@
 <?php
-// Version: 2.0; ManageMaintenance
+// Version: 2.1; ManageMaintenance
 
 $txt['repair_zero_ids'] = 'Found topics and/or messages with topic or message IDs of 0.';
 $txt['repair_missing_topics'] = 'Message #%1$d is in non-existent topic #%2$d.';
@@ -99,7 +99,7 @@ $txt['error_url'] = 'URL of page causing the error';
 $txt['error_message'] = 'Error message';
 $txt['clear_filter'] = 'Clear filter';
 $txt['remove_selection'] = 'Remove Selection';
-$txt['remove_filtered_results'] = 'Remove All Filtered Results';
+$txt['remove_filtered_results'] = 'Remove all filtered results';
 $txt['sure_about_errorlog_remove'] = 'Are you sure you want to completely clear the error log?';
 $txt['remove_selection_confirm'] = 'Are you sure you want to delete the selected entries?';
 $txt['remove_filtered_results_confirm'] = 'Are you sure you want to delete the filtered entries?';
@@ -132,7 +132,7 @@ $txt['maintain_logs_info'] = 'This function will empty out all unimportant logs.
 $txt['maintain_cache'] = 'Empty the file cache';
 $txt['maintain_cache_info'] = 'This function will empty out the file cache should you need it to be cleared.';
 $txt['maintain_optimize'] = 'Optimize all tables';
-$txt['maintain_optimize_info'] = 'This task allows you to optimize all tables. This will get rid of overhead, effectively making the tables smaller in size and your forum faster!';
+$txt['maintain_optimize_info'] = 'This task allows you to optimize all tables. This will get rid of overhead, effectively making the tables smaller in size and your forum faster.';
 $txt['maintain_version'] = 'Check all files against current versions';
 $txt['maintain_version_info'] = 'This maintenance task allows you to do a detailed version check of all forum files against the official list of latest versions.';
 $txt['maintain_run_now'] = 'Run task now';
@@ -152,11 +152,14 @@ $txt['maintain_old_nothing_else'] = 'Any sort of topic.';
 $txt['maintain_old_are_moved'] = 'Moved topic notices.';
 $txt['maintain_old_are_locked'] = 'Locked.';
 $txt['maintain_old_are_not_stickied'] = 'But don\'t count stickied topics.';
-$txt['maintain_old_all'] = 'All Boards (click to select specific boards)';
-$txt['maintain_old_choose'] = 'Specific Boards (click to select all)';
+$txt['maintain_old_all'] = 'All boards (click to select specific boards)';
+$txt['maintain_old_choose'] = 'Specific boards (click to select all)';
 $txt['maintain_old_remove'] = 'Remove now';
 $txt['maintain_old_confirm'] = 'Are you really sure you want to delete old posts now?\\n\\nThis cannot be undone!';
 
+$txt['maintain_old_drafts'] = 'Remove old drafts';
+$txt['maintain_old_drafts_days'] = 'Remove all drafts older than';
+$txt['maintain_old_drafts_confirm'] = 'Are you really sure you want to delete old drafts now?\\n\\nThis cannot be undone!';
 $txt['maintain_members'] = 'Remove Inactive Members';
 $txt['maintain_members_ungrouped'] = 'Ungrouped Members <span class="smalltext">(Members with no assigned groups)</span>';
 $txt['maintain_members_since1'] = 'Remove all members who have not';
@@ -172,7 +175,7 @@ $txt['utf8_title'] = 'Convert the database and data to UTF-8';
 $txt['utf8_introduction'] = 'UTF-8 is an international character set covering nearly all languages around the world. Converting your database and data to UTF-8 can make it easier to support multiple languages on the same board. It also can enhance search and sorting capabilities for languages with non-latin characters.';
 $txt['utf8_warning'] = 'If you want to convert your data and database to UTF-8, be aware of the following:
 <ul class="normallist">
-	<li>Converting character sets might be <em>harmful</em> for your data! Make sure you have backed up your database <em>before</em> converting.</li>
+	<li>Converting character sets might be <em>harmful</em> for your data. Make sure you have backed up your database <em>before</em> converting.</li>
 	<li>Because UTF-8 is a richer character set than most other character sets, there\'s no way back, unless by restoring your database to before the conversion.</li>
 	<li>After converting your data and database to UTF-8, you will need UTF-8 compatible language files.</li>
 </ul>';
@@ -186,6 +189,15 @@ $txt['utf8_target_charset'] = 'Convert data and database to';
 $txt['utf8_utf8'] = 'UTF-8';
 $txt['utf8_db_version_too_low'] = 'The version of MySQL that your database server is using is not high enough to support UTF-8 properly. A minimum version of 4.1.2 is required.';
 $txt['utf8_cannot_convert_fulltext'] = 'Your messages table is using a fulltext index for use when searching.  You cannot proceed in converting to UTF-8 until that index is removed. You can re-create it after the conversion has been completed.';
+
+$txt['text_title'] = 'Convert to TEXT';
+$txt['mediumtext_title'] = 'Convert to MEDIUMTEXT';
+$txt['mediumtext_introduction'] = 'The default messages table can contain posts up to a size of 65535 characters, in order be able to store bigger texts the column must be converted to "MEDIUMTEXT". It is also possible to revert the column back to TEXT (that operation would reduce the space occupied), but <strong>only if</strong> none of the posts in your database exceed the size of 65535 characters. This condition will be verified before the conversion.';
+$txt['body_checking_introduction'] = 'This function will convert the column of your database that contains the text of the messages into a "TEXT" format (currently is "MEDIUMTEXT"). This operation will allow to slightly reduce the amount of space occupied by each message (1 byte per message). If any message stored into the database is longer than 65535 characters it will be truncated and part of the text will be lost.';
+$txt['exceeding_messages'] = 'The following messages are longer than 65535 characters and will be truncated by the process:';
+$txt['exceeding_messages_morethan'] = 'And other %1$d';
+$txt['convert_to_text'] = 'No messages are longer than 65535 characters. You can safely proceed with the conversion without losing any part of the text.';
+$txt['convert_to_suggest_text'] = 'The messages body column in your database is currently set as MEDIUMTEXT, but the maximum allowed length set for the messages is lower than 65535 characters. You may free some space converting the column to TEXT.';
 
 $txt['entity_convert_title'] = 'Convert HTML-entities to UTF-8 characters';
 $txt['entity_convert_only_utf8'] = 'The database needs to be in UTF-8 format before HTML-entities can be converted to UTF-8';

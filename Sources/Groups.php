@@ -7,14 +7,14 @@
  *
  * @package SMF
  * @author Simple Machines http://www.simplemachines.org
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
  */
 
 if (!defined('SMF'))
-	die('Hacking attempt...');
+	die('No direct access...');
 
 /**
  * Entry point function, permission checks, admin bars, etc.
@@ -67,91 +67,8 @@ function Groups()
  */
 function GroupList()
 {
-	global $txt, $scripturl, $user_profile, $user_info, $context, $settings, $modSettings, $smcFunc, $sourcedir;
+	global $txt, $context, $sourcedir, $scripturl;
 
-	// Yep, find the groups...
-	$request = $smcFunc['db_query']('', '
-		SELECT mg.id_group, mg.group_name, mg.description, mg.group_type, mg.online_color, mg.hidden,
-			mg.icons, IFNULL(gm.id_member, 0) AS can_moderate
-		FROM {db_prefix}membergroups AS mg
-			LEFT JOIN {db_prefix}group_moderators AS gm ON (gm.id_group = mg.id_group AND gm.id_member = {int:current_member})
-		WHERE mg.min_posts = {int:min_posts}
-			AND mg.id_group != {int:mod_group}' . (allowedTo('admin_forum') ? '' : '
-			AND mg.group_type != {int:is_protected}') . '
-		ORDER BY group_name',
-		array(
-			'current_member' => $user_info['id'],
-			'min_posts' => -1,
-			'mod_group' => 3,
-			'is_protected' => 1,
-		)
-	);
-	// This is where we store our groups.
-	$context['groups'] = array();
-	$group_ids = array();
-	$context['can_moderate'] = allowedTo('manage_membergroups');
-	while ($row = $smcFunc['db_fetch_assoc']($request))
-	{
-		// We only list the groups they can see.
-		if ($row['hidden'] && !$row['can_moderate'] && !allowedTo('manage_membergroups'))
-			continue;
-
-		$row['icons'] = explode('#', $row['icons']);
-
-		$context['groups'][$row['id_group']] = array(
-			'id' => $row['id_group'],
-			'name' => $row['group_name'],
-			'desc' => $row['description'],
-			'color' => $row['online_color'],
-			'type' => $row['group_type'],
-			'num_members' => 0,
-			'icons' => !empty($row['icons'][0]) && !empty($row['icons'][1]) ? str_repeat('<img src="' . $settings['images_url'] . '/' . $row['icons'][1] . '" alt="*" />', $row['icons'][0]) : '',
-		);
-
-		$context['can_moderate'] |= $row['can_moderate'];
-		$group_ids[] = $row['id_group'];
-	}
-	$smcFunc['db_free_result']($request);
-
-	// Count up the members separately...
-	if (!empty($group_ids))
-	{
-		$query = $smcFunc['db_query']('', '
-			SELECT id_group, COUNT(*) AS num_members
-			FROM {db_prefix}members
-			WHERE id_group IN ({array_int:group_list})
-			GROUP BY id_group',
-			array(
-				'group_list' => $group_ids,
-			)
-		);
-		while ($row = $smcFunc['db_fetch_assoc']($query))
-			$context['groups'][$row['id_group']]['num_members'] += $row['num_members'];
-		$smcFunc['db_free_result']($query);
-
-		// Only do additional groups if we can moderate...
-		if ($context['can_moderate'])
-		{
-			$query = $smcFunc['db_query']('', '
-				SELECT mg.id_group, COUNT(*) AS num_members
-				FROM {db_prefix}membergroups AS mg
-					INNER JOIN {db_prefix}members AS mem ON (mem.additional_groups != {string:blank_screen}
-						AND mem.id_group != mg.id_group
-						AND FIND_IN_SET(mg.id_group, mem.additional_groups) != 0)
-				WHERE mg.id_group IN ({array_int:group_list})
-				GROUP BY mg.id_group',
-				array(
-					'group_list' => $group_ids,
-					'blank_screen' => '',
-				)
-			);
-			while ($row = $smcFunc['db_fetch_assoc']($query))
-				$context['groups'][$row['id_group']]['num_members'] += $row['num_members'];
-			$smcFunc['db_free_result']($query);
-		}
-	}
-
-	$context['sub_template'] = 'group_index';
 	$context['page_title'] = $txt['viewing_groups'];
 
 	// Making a list is not hard with this beauty.
@@ -161,8 +78,14 @@ function GroupList()
 	$listOptions = array(
 		'id' => 'group_lists',
 		'title' => $context['page_title'],
+		'base_href' => $scripturl . '?action=moderate;area=viewgroups;sa=view',
+		'default_sort_col' => 'group',
 		'get_items' => array(
-			'function' => 'list_getGroups',
+			'file' => $sourcedir . '/Subs-Membergroups.php',
+			'function' => 'list_getMembergroups',
+			'params' => array(
+				'regular',
+			),
 		),
 		'columns' => array(
 			'group' => array(
@@ -170,17 +93,30 @@ function GroupList()
 					'value' => $txt['name'],
 				),
 				'data' => array(
-					'function' => create_function('$group', '
-						global $scripturl, $context;
+					'function' => create_function('$rowData', '
+						global $scripturl;
 
-						$output = \'<a href="\' . $scripturl . \'?action=\' . $context[\'current_action\'] . (isset($context[\'admin_area\']) ? \';area=\' . $context[\'admin_area\'] : \'\') . \';sa=members;group=\' . $group[\'id\'] . \'" \' . ($group[\'color\'] ? \'style="color: \' . $group[\'color\'] . \';"\' : \'\') . \'>\' . $group[\'name\'] . \'</a>\';
+						// Since the moderator group has no explicit members, no link is needed.
+						if ($rowData[\'id_group\'] == 3)
+							$group_name = $rowData[\'group_name\'];
+						else
+						{
+							$color_style = empty($rowData[\'online_color\']) ? \'\' : sprintf(\' style="color: %1$s;"\', $rowData[\'online_color\']);
+							$group_name = sprintf(\'<a href="%1$s?action=admin;area=membergroups;sa=members;group=%2$d"%3$s>%4$s</a>\', $scripturl, $rowData[\'id_group\'], $color_style, $rowData[\'group_name\']);
+						}
 
-						if ($group[\'desc\'])
-							$output .= \'<div class="smalltext">\' . $group[\'desc\'] . \'</div>\';
+						// Add a help option for moderator and administrator.
+						if ($rowData[\'id_group\'] == 1)
+							$group_name .= sprintf(\' (<a href="%1$s?action=helpadmin;help=membergroup_administrator" onclick="return reqOverlayDiv(this.href);">?</a>)\', $scripturl);
+						elseif ($rowData[\'id_group\'] == 3)
+							$group_name .= sprintf(\' (<a href="%1$s?action=helpadmin;help=membergroup_moderator" onclick="return reqOverlayDiv(this.href);">?</a>)\', $scripturl);
 
-						return $output;
+						return $group_name;
 					'),
-					'style' => 'width: 50%;',
+				),
+				'sort' => array(
+					'default' => 'CASE WHEN mg.id_group < 4 THEN mg.id_group ELSE 4 END, mg.group_name',
+					'reverse' => 'CASE WHEN mg.id_group < 4 THEN mg.id_group ELSE 4 END, mg.group_name DESC',
 				),
 			),
 			'icons' => array(
@@ -190,6 +126,10 @@ function GroupList()
 				'data' => array(
 					'db' => 'icons',
 				),
+				'sort' => array(
+					'default' => 'mg.icons',
+					'reverse' => 'mg.icons DESC',
+				)
 			),
 			'moderators' => array(
 				'header' => array(
@@ -208,8 +148,17 @@ function GroupList()
 					'value' => $txt['membergroups_members_top'],
 				),
 				'data' => array(
-					'comma_format' => true,
-					'db' => 'num_members',
+					'function' => create_function('$rowData', '
+						global $txt;
+
+						// No explicit members for the moderator group.
+						return $rowData[\'id_group\'] == 3 ? $txt[\'membergroups_guests_na\'] : comma_format($rowData[\'num_members\']);
+					'),
+					'class' => 'centercol',
+				),
+				'sort' => array(
+					'default' => 'CASE WHEN mg.id_group < 4 THEN mg.id_group ELSE 4 END, 1',
+					'reverse' => 'CASE WHEN mg.id_group < 4 THEN mg.id_group ELSE 4 END, 1 DESC',
 				),
 			),
 		),
@@ -223,147 +172,6 @@ function GroupList()
 }
 
 /**
- * Get the group information for the list.
- * @param int $start
- * @param int $items_per_page
- * @param int $sort
- */
-function list_getGroups($start, $items_per_page, $sort)
-{
-	global $smcFunc, $txt, $scripturl, $user_info, $settings, $context;
-
-	// Yep, find the groups...
-	$request = $smcFunc['db_query']('', '
-		SELECT mg.id_group, mg.group_name, mg.description, mg.group_type, mg.online_color, mg.hidden,
-			mg.icons, IFNULL(gm.id_member, 0) AS can_moderate
-		FROM {db_prefix}membergroups AS mg
-			LEFT JOIN {db_prefix}group_moderators AS gm ON (gm.id_group = mg.id_group AND gm.id_member = {int:current_member})
-		WHERE mg.min_posts = {int:min_posts}
-			AND mg.id_group != {int:mod_group}' . (allowedTo('admin_forum') ? '' : '
-			AND mg.group_type != {int:is_protected}') . '
-		ORDER BY group_name',
-		array(
-			'current_member' => $user_info['id'],
-			'min_posts' => -1,
-			'mod_group' => 3,
-			'is_protected' => 1,
-		)
-	);
-	// Start collecting the data.
-	$groups = array();
-	$group_ids = array();
-	$context['can_moderate'] = allowedTo('manage_membergroups');
-	while ($row = $smcFunc['db_fetch_assoc']($request))
-	{
-		// We only list the groups they can see.
-		if ($row['hidden'] && !$row['can_moderate'] && !allowedTo('manage_membergroups'))
-			continue;
-
-		$row['icons'] = explode('#', $row['icons']);
-
-		$groups[$row['id_group']] = array(
-			'id' => $row['id_group'],
-			'name' => $row['group_name'],
-			'desc' => $row['description'],
-			'color' => $row['online_color'],
-			'type' => $row['group_type'],
-			'num_members' => 0,
-			'moderators' => array(),
-			'icons' => !empty($row['icons'][0]) && !empty($row['icons'][1]) ? str_repeat('<img src="' . $settings['images_url'] . '/' . $row['icons'][1] . '" alt="*" />', $row['icons'][0]) : '',
-		);
-
-		$context['can_moderate'] |= $row['can_moderate'];
-		$group_ids[] = $row['id_group'];
-	}
-	$smcFunc['db_free_result']($request);
-
-	// Count up the members separately...
-	if (!empty($group_ids))
-	{
-		$query = $smcFunc['db_query']('', '
-			SELECT id_group, COUNT(*) AS num_members
-			FROM {db_prefix}members
-			WHERE id_group IN ({array_int:group_list})
-			GROUP BY id_group',
-			array(
-				'group_list' => $group_ids,
-			)
-		);
-		while ($row = $smcFunc['db_fetch_assoc']($query))
-			$groups[$row['id_group']]['num_members'] += $row['num_members'];
-		$smcFunc['db_free_result']($query);
-
-		// Only do additional groups if we can moderate...
-		if ($context['can_moderate'])
-		{
-			$query = $smcFunc['db_query']('', '
-				SELECT mg.id_group, COUNT(*) AS num_members
-				FROM {db_prefix}membergroups AS mg
-					INNER JOIN {db_prefix}members AS mem ON (mem.additional_groups != {string:blank_screen}
-						AND mem.id_group != mg.id_group
-						AND FIND_IN_SET(mg.id_group, mem.additional_groups) != 0)
-				WHERE mg.id_group IN ({array_int:group_list})
-				GROUP BY mg.id_group',
-				array(
-					'group_list' => $group_ids,
-					'blank_screen' => '',
-				)
-			);
-			while ($row = $smcFunc['db_fetch_assoc']($query))
-				$groups[$row['id_group']]['num_members'] += $row['num_members'];
-			$smcFunc['db_free_result']($query);
-		}
-	}
-
-	// Get any group moderators.
-	// Count up the members separately...
-	if (!empty($group_ids))
-	{
-		$query = $smcFunc['db_query']('', '
-			SELECT mods.id_group, mods.id_member, mem.member_name, mem.real_name
-			FROM {db_prefix}group_moderators AS mods
-				INNER JOIN {db_prefix}members AS mem ON (mem.id_member = mods.id_member)
-			WHERE mods.id_group IN ({array_int:group_list})',
-			array(
-				'group_list' => $group_ids,
-			)
-		);
-		while ($row = $smcFunc['db_fetch_assoc']($query))
-			$groups[$row['id_group']]['moderators'][] = '<a href="' . $scripturl . '?action=profile;u=' . $row['id_member'] . '">' . $row['real_name'] . '</a>';
-		$smcFunc['db_free_result']($query);
-	}
-
-	return $groups;
-}
-
-/**
- * How many groups are there that are visible?
- *
- * @return int, the groups count.
- */
-function list_getGroupCount()
-{
-	global $smcFunc;
-
-	$request = $smcFunc['db_query']('', '
-		SELECT COUNT(id_group) AS group_count
-		FROM {db_prefix}membergroups
-		WHERE mg.min_posts = {int:min_posts}
-			AND mg.id_group != {int:mod_group}' . (allowedTo('admin_forum') ? '' : '
-			AND mg.group_type != {int:is_protected}'),
-		array(
-			'min_posts' => -1,
-			'mod_group' => 3,
-			'is_protected' => 1,
-		)
-	);
-	list ($group_count) = $smcFunc['db_fetch_row']($request);
-	$smcFunc['db_free_result']($request);
-
-	return $group_count;
-}
-
-/**
  * Display members of a group, and allow adding of members to a group. Silly function name though ;)
  * It can be called from ManageMembergroups if it needs templating within the admin environment.
  * It shows a list of members that are part of a given membergroup.
@@ -373,6 +181,7 @@ function list_getGroupCount()
  * It allows sorting on several columns.
  * It redirects to itself.
  * @uses ManageMembergroups template, group_members sub template.
+ * @todo: use createList
  */
 function MembergroupMembers()
 {
@@ -816,7 +625,6 @@ function GroupRequests()
 	// This is all the information required for a group listing.
 	$listOptions = array(
 		'id' => 'group_request_list',
-		'title' => $txt['mc_group_requests'],
 		'width' => '100%',
 		'items_per_page' => $modSettings['defaultMaxMessages'],
 		'no_items_label' => $txt['mc_groupr_none_found'],
@@ -872,7 +680,7 @@ function GroupRequests()
 			'date' => array(
 				'header' => array(
 					'value' => $txt['date'],
-					'style' => 'width: 18%;white-space:nowrap;',
+					'style' => 'width: 18%; white-space:nowrap;',
 				),
 				'data' => array(
 					'db' => 'time_submitted',
@@ -882,6 +690,7 @@ function GroupRequests()
 				'header' => array(
 					'value' => '<input type="checkbox" class="input_check" onclick="invertAll(this, this.form);" />',
 					'style' => 'width: 4%;',
+					'class' => 'centercol',
 				),
 				'data' => array(
 					'sprintf' => array(
@@ -890,7 +699,7 @@ function GroupRequests()
 							'id' => false,
 						),
 					),
-					'style' => 'text-align: center;',
+					'class' => 'centercol',
 				),
 			),
 		),
@@ -915,7 +724,7 @@ function GroupRequests()
 						<option value="reason">' . $txt['mc_groupr_reject_w_reason'] . '</option>
 					</select>
 					<input type="submit" name="go" value="' . $txt['go'] . '" onclick="var sel = document.getElementById(\'req_action\'); if (sel.value != 0 &amp;&amp; sel.value != \'reason\' &amp;&amp; !confirm(\'' . $txt['mc_groupr_warning'] . '\')) return false;" class="button_submit" />',
-				'align' => 'right',
+				'class' => 'floatright',
 			),
 		),
 	);
@@ -925,6 +734,9 @@ function GroupRequests()
 	createList($listOptions);
 
 	$context['default_list'] = 'group_request_list';
+	$context[$context['moderation_menu_name']]['tab_data'] = array(
+		'title' => $txt['mc_group_requests'],
+	);
 }
 
 /**
@@ -969,7 +781,7 @@ function list_getGroupRequestCount($where, $where_parameters)
  */
 function list_getGroupRequests($start, $items_per_page, $sort, $where, $where_parameters)
 {
-	global $smcFunc, $txt, $scripturl;
+	global $smcFunc, $scripturl;
 
 	$request = $smcFunc['db_query']('', '
 		SELECT lgr.id_request, lgr.id_member, lgr.id_group, lgr.time_applied, lgr.reason,

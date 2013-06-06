@@ -16,8 +16,7 @@
  * - any support website for the theme should be in website.
  * - layers and templates (non-default) should go in those elements ;).
  * - if the images dir isn't images, specify in the images element.
- * - any extra rows for themes should go in extra, serialized.
- * (as in array(variable => value).)
+ * - any extra rows for themes should go in extra, serialized. (as in array(variable => value).)
  * - tar and gzip the directory - and you're done!
  * - please include any special license in a license.txt file.
  *
@@ -25,14 +24,14 @@
  *
  * @package SMF
  * @author Simple Machines http://www.simplemachines.org
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
  */
 
 if (!defined('SMF'))
-	die('Hacking attempt...');
+	die('No direct access...');
 
 /**
  * Subaction handler - manages the action and delegates control to the proper
@@ -1048,7 +1047,7 @@ function PickTheme()
 		// Change a specific member's theme.
 		else
 		{
-			// The forum's default theme is always 0 and we 
+			// The forum's default theme is always 0 and we
 			if (isset($_GET['th']) && $_GET['th'] == 0)
 					$_GET['th'] = $modSettings['theme_guests'];
 
@@ -1353,7 +1352,7 @@ function ThemeInstall()
 		mkdir($theme_dir . '/scripts', 0777);
 
 		// Copy over the default non-theme files.
-		$to_copy = array('/index.php', '/index.template.php', '/css/index.css', '/css/rtl.css', '/scripts/theme.js');
+		$to_copy = array('/index.php', '/index.template.php', '/css/index.css', '/css/rtl.css', '/css/admin.css', '/scripts/theme.js');
 		foreach ($to_copy as $file)
 		{
 			copy($settings['default_theme_dir'] . $file, $theme_dir . $file);
@@ -1435,7 +1434,9 @@ function ThemeInstall()
 		if (!is_writable($boarddir . '/Themes'))
 			fatal_lang_error('theme_install_write_error', 'critical');
 
-		require_once($sourcedir . '/Subs-Package.php');
+		// This happens when the admin session is gone and the user has to login again
+		if (empty($_FILES['theme_gz']) && empty($_REQUEST['theme_gz']))
+			redirectexit('action=admin;area=theme;sa=admin;' . $context['session_var'] . '=' . $context['session_id']);
 
 		// Set the default settings...
 		$theme_name = strtok(basename(isset($_FILES['theme_gz']) ? $_FILES['theme_gz']['name'] : $_REQUEST['theme_gz']), '.');
@@ -1470,6 +1471,15 @@ function ThemeInstall()
 		if (file_exists($theme_dir . '/theme_info.xml'))
 		{
 			$theme_info = file_get_contents($theme_dir . '/theme_info.xml');
+			// Parse theme-info.xml into an xmlArray.
+			require_once($sourcedir . '/Class-Package.php');
+			$theme_info_xml = new xmlArray($theme_info);
+			// @todo Error message of some sort?
+			if (!$theme_info_xml->exists('theme-info[0]'))
+				return 'package_get_error_packageinfo_corrupt';
+
+			$theme_info_xml = $theme_info_xml->path('theme-info[0]');
+			$theme_info_xml = $theme_info_xml->to_array();
 
 			$xml_elements = array(
 				'name' => 'name',
@@ -1479,17 +1489,18 @@ function ThemeInstall()
 			);
 			foreach ($xml_elements as $var => $name)
 			{
-				if (preg_match('~<' . $name . '>(?:<!\[CDATA\[)?(.+?)(?:\]\]>)?</' . $name . '>~', $theme_info, $match) == 1)
-					$install_info[$var] = $match[1];
+				if (!empty($theme_info_xml[$name]))
+					$install_info[$var] = $theme_info_xml[$name];
 			}
 
-			if (preg_match('~<images>(?:<!\[CDATA\[)?(.+?)(?:\]\]>)?</images>~', $theme_info, $match) == 1)
+			if (!empty($theme_info_xml['images']))
 			{
-				$install_info['images_url'] = $install_info['theme_url'] . '/' . $match[1];
+				$install_info['images_url'] = $install_info['theme_url'] . '/' . $theme_info_xml['images'];
 				$explicit_images = true;
 			}
-			if (preg_match('~<extra>(?:<!\[CDATA\[)?(.+?)(?:\]\]>)?</extra>~', $theme_info, $match) == 1)
-				$install_info += unserialize($match[1]);
+
+			if (!empty($theme_info_xml['extra']))
+				$install_info += unserialize($theme_info_xml['extra']);
 		}
 
 		if (isset($install_info['based_on']))
@@ -1793,6 +1804,9 @@ function EditTheme()
 	list ($theme_dir, $context['theme_id']) = $smcFunc['db_fetch_row']($request);
 	$smcFunc['db_free_result']($request);
 
+	if (!file_exists($theme_dir . '/index.template.php') && !file_exists($theme_dir . '/css/index.css'))
+		fatal_lang_error('theme_edit_missing', false);
+
 	if (!isset($_REQUEST['filename']))
 	{
 		if (isset($_GET['directory']))
@@ -1913,6 +1927,9 @@ function EditTheme()
 			// You were able to submit it, so it's reasonable to assume you are allowed to save.
 			$context['allow_save'] = true;
 
+			// Re-create the token so that it can be used
+			createToken('admin-te-' . md5($_GET['th'] . '-' . $_REQUEST['filename']));
+
 			return;
 		}
 	}
@@ -1972,6 +1989,13 @@ function EditTheme()
 	createToken('admin-te-' . md5($_GET['th'] . '-' . $_REQUEST['filename']));
 }
 
+/**
+ * Generates a file listing for a given directory
+ *
+ * @param type $path
+ * @param type $relative
+ * @return type
+ */
 function get_file_listing($path, $relative)
 {
 	global $scripturl, $txt, $context;
@@ -2033,6 +2057,10 @@ function get_file_listing($path, $relative)
 	return array_merge($listing1, $listing2);
 }
 
+/**
+ * Makes a copy of a template file in a new location
+ * @uses Themes template, copy_template sub-template.
+ */
 function CopyTemplate()
 {
 	global $context, $settings, $smcFunc;

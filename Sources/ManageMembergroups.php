@@ -7,14 +7,14 @@
  *
  * @package SMF
  * @author Simple Machines http://www.simplemachines.org
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
  */
 
 if (!defined('SMF'))
-	die('Hacking attempt...');
+	die('No direct access...');
 
 
 /**
@@ -115,16 +115,16 @@ function MembergroupIndex()
 
 						// Add a help option for moderator and administrator.
 						if ($rowData[\'id_group\'] == 1)
-							$group_name .= sprintf(\' (<a href="%1$s?action=helpadmin;help=membergroup_administrator" onclick="return reqWin(this.href);">?</a>)\', $scripturl);
+							$group_name .= sprintf(\' (<a href="%1$s?action=helpadmin;help=membergroup_administrator" onclick="return reqOverlayDiv(this.href);">?</a>)\', $scripturl);
 						elseif ($rowData[\'id_group\'] == 3)
-							$group_name .= sprintf(\' (<a href="%1$s?action=helpadmin;help=membergroup_moderator" onclick="return reqWin(this.href);">?</a>)\', $scripturl);
+							$group_name .= sprintf(\' (<a href="%1$s?action=helpadmin;help=membergroup_moderator" onclick="return reqOverlayDiv(this.href);">?</a>)\', $scripturl);
 
 						return $group_name;
 					'),
 				),
 				'sort' => array(
-					'default' => 'CASE WHEN id_group < 4 THEN id_group ELSE 4 END, group_name',
-					'reverse' => 'CASE WHEN id_group < 4 THEN id_group ELSE 4 END, group_name DESC',
+					'default' => 'CASE WHEN mg.id_group < 4 THEN mg.id_group ELSE 4 END, mg.group_name',
+					'reverse' => 'CASE WHEN mg.id_group < 4 THEN mg.id_group ELSE 4 END, mg.group_name DESC',
 				),
 			),
 			'icons' => array(
@@ -132,50 +132,36 @@ function MembergroupIndex()
 					'value' => $txt['membergroups_icons'],
 				),
 				'data' => array(
-					'function' => create_function('$rowData', '
-						global $settings;
-
-						$icons = explode(\'#\', $rowData[\'icons\']);
-
-						// In case no icons are setup, return with nothing
-						if (empty($icons[0]) || empty($icons[1]))
-							return \'\';
-
-						// Otherwise repeat the image a given number of times.
-						else
-						{
-							$image = sprintf(\'<img src="%1$s/%2$s" alt="*" />\', $settings[\'images_url\'], $icons[1]);
-							return str_repeat($image, $icons[0]);
-						}
-					'),
-
+					'db' => 'icons',
 				),
 				'sort' => array(
-					'default' => 'icons',
-					'reverse' => 'icons DESC',
+					'default' => 'mg.icons',
+					'reverse' => 'mg.icons DESC',
 				)
 			),
 			'members' => array(
 				'header' => array(
 					'value' => $txt['membergroups_members_top'],
+					'class' => 'centercol',
 				),
 				'data' => array(
 					'function' => create_function('$rowData', '
 						global $txt;
 
 						// No explicit members for the moderator group.
-						return $rowData[\'id_group\'] == 3 ? $txt[\'membergroups_guests_na\'] : $rowData[\'num_members\'];
+						return $rowData[\'id_group\'] == 3 ? $txt[\'membergroups_guests_na\'] : comma_format($rowData[\'num_members\']);
 					'),
-					'style' => 'text-align: center',
+					'class' => 'centercol',
 				),
 				'sort' => array(
-					'default' => 'CASE WHEN id_group < 4 THEN id_group ELSE 4 END, 1',
-					'reverse' => 'CASE WHEN id_group < 4 THEN id_group ELSE 4 END, 1 DESC',
+					'default' => 'CASE WHEN mg.id_group < 4 THEN mg.id_group ELSE 4 END, 1',
+					'reverse' => 'CASE WHEN mg.id_group < 4 THEN mg.id_group ELSE 4 END, 1 DESC',
 				),
 			),
 			'modify' => array(
 				'header' => array(
 					'value' => $txt['modify'],
+					'class' => 'centercol',
 				),
 				'data' => array(
 					'sprintf' => array(
@@ -184,7 +170,7 @@ function MembergroupIndex()
 							'id_group' => false,
 						),
 					),
-					'style' => 'text-align: center',
+					'class' => 'centercol',
 				),
 			),
 		),
@@ -195,8 +181,6 @@ function MembergroupIndex()
 			),
 		),
 	);
-
-	call_integration_hook('integrate_modify_regular_groups', array(&$listOptions));
 
 	require_once($sourcedir . '/Subs-List.php');
 	createList($listOptions);
@@ -232,8 +216,8 @@ function MembergroupIndex()
 					'),
 				),
 				'sort' => array(
-					'default' => 'group_name',
-					'reverse' => 'group_name DESC',
+					'default' => 'mg.group_name',
+					'reverse' => 'mg.group_name DESC',
 				),
 			),
 			'icons' => array(
@@ -241,32 +225,21 @@ function MembergroupIndex()
 					'value' => $txt['membergroups_icons'],
 				),
 				'data' => array(
-					'function' => create_function('$rowData', '
-						global $settings;
-
-						$icons = explode(\'#\', $rowData[\'icons\']);
-
-						if (empty($icons[0]) || empty($icons[1]))
-							return \'\';
-						else
-						{
-							$icon_image = sprintf(\'<img src="%1$s/%2$s" alt="*" />\', $settings[\'images_url\'], $icons[1]);
-							return str_repeat($icon_image, $icons[0]);
-						}
-					'),
+					'db' => 'icons',
 				),
 				'sort' => array(
-					'default' => 'CASE WHEN id_group < 4 THEN id_group ELSE 4 END, icons',
-					'reverse' => 'CASE WHEN id_group < 4 THEN id_group ELSE 4 END, icons DESC',
+					'default' => 'CASE WHEN mg.id_group < 4 THEN mg.id_group ELSE 4 END, icons',
+					'reverse' => 'CASE WHEN mg.id_group < 4 THEN mg.id_group ELSE 4 END, icons DESC',
 				)
 			),
 			'members' => array(
 				'header' => array(
 					'value' => $txt['membergroups_members_top'],
+					'class' => 'centercol',
 				),
 				'data' => array(
 					'db' => 'num_members',
-					'style' => 'text-align: center',
+					'class' => 'centercol',
 				),
 				'sort' => array(
 					'default' => '1 DESC',
@@ -276,19 +249,21 @@ function MembergroupIndex()
 			'required_posts' => array(
 				'header' => array(
 					'value' => $txt['membergroups_min_posts'],
+					'class' => 'centercol',
 				),
 				'data' => array(
 					'db' => 'min_posts',
-					'style' => 'text-align: center',
+					'class' => 'centercol',
 				),
 				'sort' => array(
-					'default' => 'min_posts',
-					'reverse' => 'min_posts DESC',
+					'default' => 'mg.min_posts',
+					'reverse' => 'mg.min_posts DESC',
 				),
 			),
 			'modify' => array(
 				'header' => array(
 					'value' => $txt['modify'],
+					'class' => 'centercol',
 				),
 				'data' => array(
 					'sprintf' => array(
@@ -297,7 +272,7 @@ function MembergroupIndex()
 							'id_group' => false,
 						),
 					),
-					'style' => 'text-align: center',
+					'class' => 'centercol',
 				),
 			),
 		),
@@ -308,8 +283,6 @@ function MembergroupIndex()
 			),
 		),
 	);
-
-	call_integration_hook('integrate_modify_post_groups', array(&$listOptions));
 
 	createList($listOptions);
 }
@@ -356,7 +329,7 @@ function AddMembergroup()
 			),
 			array(
 				$id_group, '', $smcFunc['htmlspecialchars']($_POST['group_name'], ENT_QUOTES), ($postCountBasedGroup ? (int) $_POST['min_posts'] : '-1'),
-				'1#star.png', '', $_POST['group_type'],
+				'1#icon.png', '', $_POST['group_type'],
 			),
 			array('id_group')
 		);
@@ -655,7 +628,7 @@ function DeleteMembergroup()
  */
 function EditMembergroup()
 {
-	global $context, $txt, $sourcedir, $modSettings, $smcFunc;
+	global $context, $txt, $sourcedir, $modSettings, $smcFunc, $settings;
 
 	$_REQUEST['group'] = isset($_REQUEST['group']) && $_REQUEST['group'] > 0 ? (int) $_REQUEST['group'] : 0;
 
@@ -1105,6 +1078,40 @@ function EditMembergroup()
 		if ($max_boards == 1)
 			$max_boards = 2;
 	}
+	
+	// Get a list of all the image formats we can select.
+	$imageExts = array('png', 'jpg', 'jpeg', 'bmp', 'gif');
+	
+	// Scan the directory.
+	$context['possible_icons'] = array();
+	if ($files = scandir($settings['default_theme_dir'] . '/images/membericons'))
+	{
+		// Loop through every file in the directory.
+		foreach ($files as $value)
+		{
+			// Grab the image extension.
+			$ext = pathinfo($settings['default_theme_dir'] . '/images/membericons/' . $value, PATHINFO_EXTENSION);
+			
+			// If the extension is not empty, and it is valid, 
+			if (!empty($ext) && in_array($ext, $imageExts))
+			{
+				// Get the size of the image.
+				$image_info = getimagesize($settings['default_theme_dir'] . '/images/membericons/' . $value);
+				
+				// If this is bigger than 128 in width or 32 in height, skip this one.
+				if ($image_info == false || $image_info[0] > 128 || $image_info[1] > 32)
+					continue;
+					
+				// Else it's valid. Add it in.
+				else
+					$context['possible_icons'][] = $value;
+			}
+		}
+	}
+	
+	// Insert our JS, if we have possible icons.
+	if (!empty($context['possible_icons']))
+		loadJavascriptFile('icondropdown.js', array('validate' => true));
 
 	// Finally, get all the groups this could be inherited off.
 	$request = $smcFunc['db_query']('', '

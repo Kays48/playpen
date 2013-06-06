@@ -2,19 +2,19 @@
 
 /**
  * This file is automatically called and handles all manner of scheduled things.
- * 
+ *
  * Simple Machines Forum (SMF)
  *
  * @package SMF
  * @author Simple Machines http://www.simplemachines.org
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
  */
 
 if (!defined('SMF'))
-	die('Hacking attempt...');
+	die('No direct access...');
 
 /**
  * This function works out what to do!
@@ -28,6 +28,8 @@ function AutoTask()
 		ReduceMailQueue();
 	else
 	{
+		call_integration_hook('integrate_autotask_include');
+
 		// Select the next task to do.
 		$request = $smcFunc['db_query']('', '
 			SELECT id_task, task, next_time, time_offset, time_regularity, time_unit
@@ -840,7 +842,12 @@ function scheduled_weekly_digest()
 }
 
 /**
- * Send a bunch of emails from the mail queue.
+ * Send a group of emails from the mail queue.
+ *
+ * @param type $number the number to send each loop through
+ * @param type $override_limit bypassing our limit flaf
+ * @param type $force_send
+ * @return boolean
  */
 function ReduceMailQueue($number = false, $override_limit = false, $force_send = false)
 {
@@ -905,7 +912,7 @@ function ReduceMailQueue($number = false, $override_limit = false, $force_send =
 
 	// Now we know how many we're sending, let's send them.
 	$request = $smcFunc['db_query']('', '
-		SELECT /*!40001 SQL_NO_CACHE */ id_mail, recipient, body, subject, headers, send_html
+		SELECT /*!40001 SQL_NO_CACHE */ id_mail, recipient, body, subject, headers, send_html, time_sent
 		FROM {db_prefix}mail_queue
 		ORDER BY priority ASC, id_mail ASC
 		LIMIT ' . $number,
@@ -924,6 +931,7 @@ function ReduceMailQueue($number = false, $override_limit = false, $force_send =
 			'subject' => $row['subject'],
 			'headers' => $row['headers'],
 			'send_html' => $row['send_html'],
+			'time_sent' => $row['time_sent'],
 		);
 	}
 	$smcFunc['db_free_result']($request);
@@ -987,7 +995,7 @@ function ReduceMailQueue($number = false, $override_limit = false, $force_send =
 
 		// Hopefully it sent?
 		if (!$result)
-			$failed_emails[] = array($email['to'], $email['body'], $email['subject'], $email['headers'], $email['send_html']);
+			$failed_emails[] = array($email['to'], $email['body'], $email['subject'], $email['headers'], $email['send_html'], $email['time_sent']);
 	}
 
 	// Any emails that didn't send?
@@ -1017,7 +1025,7 @@ function ReduceMailQueue($number = false, $override_limit = false, $force_send =
 		// Add our email back to the queue, manually.
 		$smcFunc['db_insert']('insert',
 			'{db_prefix}mail_queue',
-			array('recipient' => 'string', 'body' => 'string', 'subject' => 'string', 'headers' => 'string', 'send_html' => 'string'),
+			array('recipient' => 'string', 'body' => 'string', 'subject' => 'string', 'headers' => 'string', 'send_html' => 'string', 'time_sent' => 'string'),
 			$failed_emails,
 			array('id_mail')
 		);
@@ -1041,6 +1049,9 @@ function ReduceMailQueue($number = false, $override_limit = false, $force_send =
 
 /**
  * Calculate the next time the passed tasks should be triggered.
+ *
+ * @param type $tasks
+ * @param type $forceUpdate
  */
 function CalculateNextTrigger($tasks = array(), $forceUpdate = false)
 {
@@ -1107,6 +1118,11 @@ function CalculateNextTrigger($tasks = array(), $forceUpdate = false)
 
 /**
  * Simply returns a time stamp of the next instance of these time parameters.
+ *
+ * @param int $regularity
+ * @param type $unit
+ * @param type $offset
+ * @return int
  */
 function next_time($regularity, $unit, $offset)
 {
@@ -1685,16 +1701,16 @@ function scheduled_remove_temp_attachments()
 /**
  * Check for move topic notices that have past their best by date
  */
-function scheduled_remove_topic_redirect() 
+function scheduled_remove_topic_redirect()
 {
 	global $smcFunc, $sourcedir;
-	
+
 	// init
 	$topics = array();
-	
+
 	// We will need this for lanaguage files
 	loadEssentialThemeData();
-	
+
 	// Find all of the old MOVE topic notices that were set to expire
 	$request = $smcFunc['db_query']('', '
 		SELECT id_topic
@@ -1705,16 +1721,56 @@ function scheduled_remove_topic_redirect()
 			'redirect_expires' => time(),
 		)
 	);
-	
+
 	while ($row = $smcFunc['db_fetch_row']($request))
 		$topics[] = $row[0];
 	$smcFunc['db_free_result']($request);
-	
+
 	// Zap, your gone
 	if (count($topics) > 0)
 	{
 		require_once($sourcedir . '/RemoveTopic.php');
 		removeTopics($topics, false, true);
+	}
+
+	return true;
+}
+
+/**
+ * Check for old drafts and remove them
+ */
+function scheduled_remove_old_drafts()
+{
+	global $smcFunc, $sourcedir, $modSettings;
+
+	if (empty($modSettings['drafts_keep_days']))
+		return true;
+
+	// init
+	$drafts= array();
+
+	// We need this for lanaguage items
+	loadEssentialThemeData();
+
+	// Find all of the old drafts
+	$request = $smcFunc['db_query']('', '
+		SELECT id_draft
+		FROM {db_prefix}user_drafts
+		WHERE poster_time <= {int:poster_time_old}',
+		array(
+			'poster_time_old' => time() - (86400 * $modSettings['drafts_keep_days']),
+		)
+	);
+
+	while ($row = $smcFunc['db_fetch_row']($request))
+		$drafts[] = (int) $row[0];
+	$smcFunc['db_free_result']($request);
+
+	// If we have old one, remove them
+	if (count($drafts) > 0)
+	{
+		require_once($sourcedir . '/Drafts.php');
+		DeleteDraft($drafts, false);
 	}
 
 	return true;

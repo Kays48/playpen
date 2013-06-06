@@ -4,7 +4,7 @@
  *
  * @package SMF
  * @author Simple Machines
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
@@ -31,7 +31,6 @@ function template_new_group()
 				<h3 class="catbg">', $txt['membergroups_new_group'], '</h3>
 			</div>
 			<div class="windowbg">
-				<span class="topslice"><span></span></span>
 				<div class="content">
 					<dl class="settings">
 						<dt>
@@ -90,8 +89,8 @@ function template_new_group()
 			echo '
 									<option value="', $group['id'], '">', $group['name'], '</option>';
 		echo '
-								</select><br />
-
+								</select>
+								<br />
 								<input type="radio" name="perm_type" id="perm_type_copy" value="copy" class="input_radio" />
 								<label for="perm_type_copy">', $txt['membergroups_new_as_copy'], ':</label>
 								<select name="copyperm" id="copyperm_select" onclick="document.getElementById(\'perm_type_copy\').checked = true;">
@@ -101,8 +100,8 @@ function template_new_group()
 			echo '
 									<option value="', $group['id'], '">', $group['name'], '</option>';
 		echo '
-								</select><br />
-
+								</select>
+								<br />
 								<input type="radio" name="perm_type" id="perm_type_predefined" value="predefined" class="input_radio" />
 								<label for="perm_type_predefined">', $txt['membergroups_new_as_type'], ':</label>
 								<select name="level" id="level_select" onclick="document.getElementById(\'perm_type_predefined\').checked = true;">
@@ -127,11 +126,8 @@ function template_new_group()
 	echo '
 						</dd>
 					</dl>
-					<hr class="hrcolor" />
 					<input type="submit" value="', $txt['membergroups_add_group'], '" class="button_submit" />
-					<br class="clear_right" />
 				</div>
-				<span class="botslice"><span></span></span>
 			</div>';
 	if ($context['undefined_group'])
 	{
@@ -150,8 +146,7 @@ function template_new_group()
 			<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
 			<input type="hidden" name="', $context['admin-mmg_token_var'], '" value="', $context['admin-mmg_token'], '" />
 		</form>
-	</div>
-	<br class="clear" />';
+	</div>';
 }
 
 function template_edit_group()
@@ -166,7 +161,6 @@ function template_edit_group()
 				</h3>
 			</div>
 			<div class="windowbg2">
-				<span class="topslice"><span></span></span>
 				<div class="content">
 					<dl class="settings">
 						<dt>
@@ -275,17 +269,40 @@ function template_edit_group()
 							<label for="icon_count_input"><strong>', $txt['membergroups_icon_count'], ':</strong></label>
 						</dt>
 						<dd>
-							<input type="text" name="icon_count" id="icon_count_input" value="', $context['group']['icon_count'], '" size="4" onkeyup="if (this.value.length > 2) this.value = 99;" onkeydown="this.onkeyup();" onchange="if (this.value != 0) this.form.icon_image.onchange();" class="input_text" />
-						</dd>
+							<input type="text" name="icon_count" id="icon_count_input" value="', $context['group']['icon_count'], '" size="4" class="input_text" />
+						</dd>';
+        
+        // Do we have any possible icons to select from?
+       	if (!empty($context['possible_icons']))
+       	{
+       		echo '
 						<dt>
 							<label for="icon_image_input"><strong>', $txt['membergroups_icon_image'], ':</strong></label><br />
 							<span class="smalltext">', $txt['membergroups_icon_image_note'], '</span>
 						</dt>
 						<dd>
 							', $txt['membergroups_images_url'], '
-							<input type="text" name="icon_image" id="icon_image_input" value="', $context['group']['icon_image'], '" onchange="if (this.value &amp;&amp; this.form.icon_count.value == 0) this.form.icon_count.value = 1; else if (!this.value) this.form.icon_count.value = 0; document.getElementById(\'star_preview\').src = smf_images_url + \'/\' + (this.value &amp;&amp; this.form.icon_count.value > 0 ? this.value.replace(/\$language/g, \'', $context['user']['language'], '\') : \'blank.png\');" size="20" class="input_text" />
-							<img id="star_preview" src="', $settings['images_url'], '/', $context['group']['icon_image'] == '' ? 'blank.png' : $context['group']['icon_image'], '" alt="*" />
-						</dd>
+							<select name="icon_image" id="icon_image_input">';
+
+		// For every possible icon, create an option.
+		foreach ($context['possible_icons'] as $icon)
+		{
+			echo '
+								<option value="', $icon, '"', $context['group']['icon_image'] == $icon ? ' selected="selected"' : '', '>', $icon, '</option>';
+		}
+	
+		echo '
+							</select>
+							<img id="icon_preview" src="" alt="*" />
+						</dd>';
+	}
+	
+	// No? Hide the entire control.
+	else
+		echo '
+						<input type="hidden" name="icon_image" value="" />';
+						
+	echo '
 						<dt>
 							<label for="max_messages_input"><strong>', $txt['membergroups_max_messages'], ':</strong></label><br />
 							<span class="smalltext">', $txt['membergroups_max_messages_note'], '</span>
@@ -307,18 +324,14 @@ function template_edit_group()
 	}
 	echo '
 					</dl>
-					<hr class="hrcolor" />
 					<input type="submit" name="save" value="', $txt['membergroups_edit_save'], '" class="button_submit" />', $context['group']['allow_delete'] ? '
 					<input type="submit" name="delete" value="' . $txt['membergroups_delete'] . '" onclick="return confirm(\'' . $txt['membergroups_confirm_delete'] . '\');" class="button_submit" />' : '', '
-					<br class="clear_right" />
 				</div>
-				<span class="botslice"><span></span></span>
 			</div>
 			<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
 			<input type="hidden" name="', $context['admin-mmg_token_var'], '" value="', $context['admin-mmg_token'], '" />
 		</form>
 	</div>
-	<br class="clear" />
 		<script type="text/javascript" src="', $settings['default_theme_url'], '/scripts/suggest.js?alp21"></script>
 		<script type="text/javascript"><!-- // --><![CDATA[
 			var oModeratorSuggest = new smc_AutoSuggest({
@@ -424,8 +437,7 @@ function template_add_edit_group_boards_list($collapse = true)
 	}
 
 	echo '
-							</ul>
-							<br class="clear" />';
+							</ul>';
 
 	if (empty($modSettings['deny_boards_access']))
 		echo '
@@ -434,7 +446,7 @@ function template_add_edit_group_boards_list($collapse = true)
 							</fieldset>';
 	else
 		echo '
-								<br />
+								<br class="clear" />
 								<span class="select_all_box">
 									<em>', $txt['all'], ': </em>
 									<input type="radio" name="select_all" id="allow_all" class="input_radio" onclick="selectAllRadio(this, this.form, \'boardaccess\', \'allow\');" /> <label for="allow_all">', $txt['board_perms_allow'], '</label>
@@ -466,12 +478,11 @@ function template_group_members()
 
 	echo '
 	<div id="admincenter">
-		<form action="', $scripturl, '?action=', $context['current_action'], (isset($context['admin_area']) ? ';area=' . $context['admin_area'] : '') , ';sa=members;group=', $context['group']['id'], '" method="post" accept-charset="', $context['character_set'], '">
+		<form action="', $scripturl, '?action=', $context['current_action'], (isset($context['admin_area']) ? ';area=' . $context['admin_area'] : '') , ';sa=members;group=', $context['group']['id'], '" method="post" accept-charset="', $context['character_set'], '" id="view_group">
 			<div class="cat_bar">
 				<h3 class="catbg">', $context['page_title'], '</h3>
 			</div>
 			<div class="windowbg">
-				<span class="topslice"><span></span></span>
 				<div class="content">
 					<dl class="settings">
 						<dt>
@@ -516,7 +527,6 @@ function template_group_members()
 	echo '
 					</dl>
 				</div>
-				<span class="botslice"><span></span></span>
 			</div>
 
 			<br />
@@ -524,7 +534,7 @@ function template_group_members()
 				<h4 class="titlebg">', $txt['membergroups_members_group_members'], '</h4>
 			</div>
 			<br />
-			<div class="pagesection">', $txt['pages'], ': ', $context['page_index'], '</div>
+			<div class="pagesection">', $context['page_index'], '</div>
 			<table width="100%" class="table_grid">
 				<thead>
 					<tr class="catbg">
@@ -598,27 +608,26 @@ function template_group_members()
 	echo '
 				</tbody>
 			</table>';
-		
+
 	if (!empty($context['group']['assignable']))
 		echo '
 			<div class="floatright">
 				<input type="submit" name="remove" value="', $txt['membergroups_members_remove'], '" class="button_submit " />
 			</div>';
-	
+
 	echo '
 			<div class="pagesection flow_hidden">
-				<div class="floatleft">', $txt['pages'], ': ', $context['page_index'], '</div>
+				<div class="floatleft">', $context['page_index'], '</div>
 			</div>
 			<br />';
-	
+
 	if (!empty($context['group']['assignable']))
 	{
 		echo '
-			<div class="cat_bar">
-				<h3 class="catbg">', $txt['membergroups_members_add_title'], '</h3>
+			<div class="cat_bar cat_bar_odd">
+				<h3 class="catbg catbg_odd">', $txt['membergroups_members_add_title'], '</h3>
 			</div>
 			<div class="windowbg">
-				<span class="topslice"><span></span></span>
 				<div class="content">
 					<dl class="settings">
 						<dt>
@@ -630,9 +639,7 @@ function template_group_members()
 						</dd>
 					</dl>
 					<input type="submit" name="add" value="', $txt['membergroups_members_add'], '" class="button_submit" />
-					<br class="clear_right" />
 				</div>
-				<span class="botslice"><span></span></span>
 			</div>';
 	}
 
@@ -640,8 +647,7 @@ function template_group_members()
 			<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
 			<input type="hidden" name="', $context['mod-mgm_token_var'], '" value="', $context['mod-mgm_token'], '" />
 		</form>
-	</div>
-	<br class="clear" />';
+	</div>';
 
 	if (!empty($context['group']['assignable']))
 		echo '
@@ -676,7 +682,6 @@ function template_group_request_reason()
 				<h3 class="catbg">', $txt['mc_groups_reason_title'], '</h3>
 			</div>
 			<div class="windowbg">
-				<span class="topslice"><span></span></span>
 				<div class="content">
 					<dl class="settings">';
 
@@ -696,13 +701,10 @@ function template_group_request_reason()
 					<input type="submit" name="go" value="', $txt['mc_groupr_submit'], '" class="button_submit" />
 					<input type="hidden" name="req_action" value="got_reason" />
 					<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
-					<br class="clear_right" />
 				</div>
-				<span class="botslice"><span></span></span>
 			</div>
 		</form>
-	</div>
-	<br class="clear" />';
+	</div>';
 }
 
 ?>

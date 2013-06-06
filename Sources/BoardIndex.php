@@ -8,14 +8,14 @@
  *
  * @package SMF
  * @author Simple Machines http://www.simplemachines.org
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
  */
 
 if (!defined('SMF'))
-	die('Hacking attempt...');
+	die('No direct access...');
 
 /**
  * This function shows the board index.
@@ -32,7 +32,10 @@ function BoardIndex()
 	if (WIRELESS)
 		$context['sub_template'] = WIRELESS_PROTOCOL . '_boardindex';
 	else
+	{
 		loadTemplate('BoardIndex');
+		$context['template_layers'][] = 'boardindex_outer';
+	}
 
 	// Set a canonical URL for this page.
 	$context['canonical_url'] = $scripturl;
@@ -108,14 +111,14 @@ function BoardIndex()
 		$context['show_calendar'] = false;
 
 	$context['page_title'] = sprintf($txt['forum_index'], $context['forum_name']);
-	
+
 	// Mark read button
 	$context['mark_read_button'] = array(
 		'markread' => array('text' => 'mark_as_read', 'image' => 'markread.png', 'lang' => true, 'url' => $scripturl . '?action=markasread;sa=all;' . $context['session_var'] . '=' . $context['session_id']),
 	);
-	
+
 	// Allow mods to add additional buttons here
-	call_integration_hook('integrate_mark_read_button'); 
+	call_integration_hook('integrate_mark_read_button');
 }
 
 /**

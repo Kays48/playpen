@@ -7,14 +7,14 @@
  *
  * @package SMF
  * @author Simple Machines http://www.simplemachines.org
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
  */
 
 if (!defined('SMF'))
-	die('Hacking attempt...');
+	die('No direct access...');
 
 /**
  * Finds or repairs errors in the database to fix possible problems.
@@ -157,7 +157,9 @@ function pauseRepairProcess($to_fix, $current_step_description, $max_substep = 0
 	obExit();
 }
 
-// Load up all the tests we might want to do ;)
+/**
+ * Load up all the tests we might want to do ;)
+ */
 function loadForumTests()
 {
 	global $errorTests;

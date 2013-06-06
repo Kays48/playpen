@@ -174,7 +174,7 @@ upgrade_query("
 
 	ALTER TABLE {$db_prefix}sessions
 	ALTER COLUMN session_id type char(64);");
-	
+
 upgrade_query("
 	ALTER TABLE {$db_prefix}log_online
 	ALTER COLUMN session SET DEFAULT '';
@@ -219,6 +219,18 @@ INSERT INTO {$db_prefix}scheduled_tasks
 	(next_time, time_offset, time_regularity, time_unit, disabled, task)
 VALUES
 	(0, 180, 1, 'd', 0, 'remove_topic_redirect');
+INSERT INTO {$db_prefix}scheduled_tasks
+	(next_time, time_offset, time_regularity, time_unit, disabled, task)
+VALUES
+	(0, 240, 1, 'd', 0, 'remove_old_drafts');
+---#
+
+/******************************************************************************/
+---- Replacing MSN with Skype
+/******************************************************************************/
+---# Modifying the "msn" column...
+ALTER TABLE {$db_prefix}members
+CHANGE msn skype varchar(255) NOT NULL DEFAULT '';
 ---#
 
 /******************************************************************************/
@@ -233,6 +245,22 @@ upgrade_query("
 ---#
 
 /******************************************************************************/
+--- Adding support for topic disregard
+/******************************************************************************/
+---# Adding new columns to log_topics...
+---{
+upgrade_query("
+	ALTER TABLE {$db_prefix}log_topics
+	ADD COLUMN disregarded int NOT NULL DEFAULT '0'");
+
+INSERT INTO {$db_prefix}settings
+	(variable, value)
+VALUES
+	('enable_disregard', 0);
+---}
+---#
+
+/******************************************************************************/
 --- Name changes
 /******************************************************************************/
 ---# Altering the membergroup stars to icons
@@ -242,3 +270,85 @@ upgrade_query("
 	CHANGE `stars` `icons` varchar(255) NOT NULL DEFAULT ''");
 ---}
 ---#
+
+/******************************************************************************/
+--- Adding support for drafts
+/******************************************************************************/
+---# Creating drafts table.
+CREATE TABLE {$db_prefix}user_drafts (
+	id_draft int unsigned NOT NULL auto_increment,
+	id_topic int unsigned NOT NULL default '0',
+	id_board smallint unsigned NOT NULL default '0',
+	id_reply int unsigned NOT NULL default '0',
+	type smallint NOT NULL default '0',
+	poster_time int unsigned NOT NULL default '0',
+	id_member int unsigned NOT NULL default '0',
+	subject varchar(255) NOT NULL default '',
+	smileys_enabled smallint NOT NULL default '1',
+	body text NOT NULL,
+	icon varchar(16) NOT NULL default 'xx',
+	locked smallint NOT NULL default '0',
+	is_sticky smallint NOT NULL default '0',
+	to_list varchar(255) NOT NULL default '',
+	outbox smallint NOT NULL default '0',
+	PRIMARY KEY (id_draft)
+);
+---#
+
+---# Adding draft permissions...
+---{
+// We cannot do this twice
+if (@$modSettings['smfVersion'] < '2.1')
+{
+	// Anyone who can currently post unapproved topics we assume can create drafts as well ...
+	$request = upgrade_query("
+		SELECT id_group, id_board, add_deny, permission
+		FROM {$db_prefix}board_permissions
+		WHERE permission = 'post_unapproved_topics'");
+	$inserts = array();
+	while ($row = $smcFunc['db_fetch_assoc']($request))
+	{
+		$inserts[] = "($row[id_group], $row[id_board], 'post_draft', $row[add_deny])";
+		$inserts[] = "($row[id_group], $row[id_board], 'post_autosave_draft', $row[add_deny])";
+	}
+	$smcFunc['db_free_result']($request);
+
+	if (!empty($inserts))
+		upgrade_query("
+			INSERT IGNORE INTO {$db_prefix}board_permissions
+				(id_group, id_board, permission, add_deny)
+			VALUES
+				" . implode(',', $inserts));
+
+	// Next we find people who can send PM's, and assume they can save pm_drafts as well
+	$request = upgrade_query("
+		SELECT id_group, add_deny, permission
+		FROM {$db_prefix}permissions
+		WHERE permission = 'pm_send'");
+	$inserts = array();
+	while ($row = $smcFunc['db_fetch_assoc']($request))
+	{
+		$inserts[] = "($row[id_group], 'pm_draft', $row[add_deny])";
+		$inserts[] = "($row[id_group], 'pm_autosave_draft', $row[add_deny])";
+	}
+	$smcFunc['db_free_result']($request);
+
+	if (!empty($inserts))
+		upgrade_query("
+			INSERT IGNORE INTO {$db_prefix}permissions
+				(id_group, permission, add_deny)
+			VALUES
+				" . implode(',', $inserts));
+}
+---}
+---#
+
+/******************************************************************************/
+--- Adding support for group-based board moderation
+/******************************************************************************/
+---# Creating moderator_groups table
+CREATE TABLE IF NOT EXISTS {$db_prefix}moderator_groups (
+  id_board smallint NOT NULL default '0',
+  id_group smallint NOT NULL default '0',
+  PRIMARY KEY (id_board, id_group)
+);

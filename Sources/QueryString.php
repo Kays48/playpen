@@ -8,14 +8,14 @@
  *
  * @package SMF
  * @author Simple Machines http://www.simplemachines.org
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
  */
 
 if (!defined('SMF'))
-	die('Hacking attempt...');
+	die('No direct access...');
 
 /**
  * Clean the request variables - add html entities to GET and slashes if magic_quotes_gpc is Off.
@@ -294,8 +294,9 @@ function cleanRequest()
 
 /**
  * Validates a IPv6 address. returns true if it is ipv6.
+ *
  * @param string $ip ip address to be validated
- * @return bool true|false
+ * @return boolean true|false
  */
 function isValidIPv6($ip)
 {
@@ -307,8 +308,9 @@ function isValidIPv6($ip)
 
 /**
  * Converts IPv6s to numbers.  This makes ban checks much easier.
+ *
  * @param string $ip ip address to be converted
- * @return array 
+ * @return array
  */
 function convertIPv6toInts($ip)
 {
@@ -333,8 +335,10 @@ function convertIPv6toInts($ip)
 
 /**
  * Expands a IPv6 address to its full form.
- * @param string $ip ip address to be converted
- * @return bool/string expanded ipv6 address.
+ *
+ * @param type $addr
+ * @param type $strict_check checks lenght to expaned address for compliance
+ * @return boolean/string expanded ipv6 address.
  */
 function expandIPv6($addr, $strict_check = true)
 {
@@ -373,7 +377,7 @@ function expandIPv6($addr, $strict_check = true)
 	// Save this incase of repeated use.
 	$converted[$addr] = $result;
 
-	// Quick check to make sure the length is as expected. 
+	// Quick check to make sure the length is as expected.
 	if (!$strict_check || strlen($result) == 39)
 		return $result;
 	else
@@ -555,7 +559,7 @@ function cleanXml($string)
 }
 
 /**
- * @todo needs a description
+ * Escapes (replaces) characters in strings to make them safe for use in javascript
  *
  * @param string $string
  * @return string
@@ -571,7 +575,7 @@ function JavaScriptEscape($string)
 		'\\' => '\\\\',
 		'\'' => '\\\'',
 		'</' => '<\' + \'/',
-		'script' => 'scri\'+\'pt',
+		'<script' => '<scri\'+\'pt',
 		'<body>' => '<bo\'+\'dy>',
 		'<a href' => '<a hr\'+\'ef',
 		$scripturl => '\' + smf_scripturl + \'',

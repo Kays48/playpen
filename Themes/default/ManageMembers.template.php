@@ -4,7 +4,7 @@
  *
  * @package SMF
  * @author Simple Machines
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
@@ -16,7 +16,7 @@ function template_search_members()
 
 	echo '
 	<div id="admincenter">
-		<form action="', $scripturl, '?action=admin;area=viewmembers" method="post" accept-charset="', $context['character_set'], '">
+		<form action="', $scripturl, '?action=admin;area=viewmembers" method="post" accept-charset="', $context['character_set'], '" id="admin_form_wrapper">
 			<div class="cat_bar">
 				<h3 class="catbg">
 					<span class="floatleft">', $txt['search_for'], '</span>
@@ -25,7 +25,6 @@ function template_search_members()
 			</div>
 			<input type="hidden" name="sa" value="query" />
 			<div class="windowbg">
-				<span class="topslice"><span></span></span>
 				<div class="content">
 					<div class="flow_hidden">
 						<div class="msearch_details floatleft">
@@ -156,9 +155,7 @@ function template_search_members()
 						</div>
 					</div>
 				</div>
-				<span class="botslice clear_right"><span></span></span>
 			</div>
-			<br class="clear" />
 			<div class="title_bar">
 				<h3 class="titlebg">', $txt['member_part_of_these_membergroups'], '</h3>
 			</div>
@@ -167,8 +164,8 @@ function template_search_members()
 					<thead>
 						<tr class="catbg">
 							<th scope="col" class="first_th">', $txt['membergroups'], '</th>
-							<th scope="col">', $txt['primary'], '</th>
-							<th scope="col" class="last_th">', $txt['additional'], '</th>
+							<th scope="col" class="centercol">', $txt['primary'], '</th>
+							<th scope="col" class="last_th centercol">', $txt['additional'], '</th>
 						</tr>
 					</thead>
 					<tbody>';
@@ -177,10 +174,10 @@ function template_search_members()
 				echo '
 						<tr class="windowbg2">
 							<td>', $membergroup['name'], '</td>
-							<td align="center">
+							<td class="centercol">
 								<input type="checkbox" name="membergroups[1][]" value="', $membergroup['id'], '" checked="checked" class="input_check" />
 							</td>
-							<td align="center">
+							<td class="centercol">
 								', $membergroup['can_be_additional'] ? '<input type="checkbox" name="membergroups[2][]" value="' . $membergroup['id'] . '" checked="checked" class="input_check" />' : '', '
 							</td>
 						</tr>';
@@ -190,10 +187,10 @@ function template_search_members()
 							<td>
 								<em>', $txt['check_all'], '</em>
 							</td>
-							<td align="center">
+							<td class="centercol">
 								<input type="checkbox" onclick="invertAll(this, this.form, \'membergroups[1]\');" checked="checked" class="input_check" />
 							</td>
-							<td align="center">
+							<td class="centercol">
 								<input type="checkbox" onclick="invertAll(this, this.form, \'membergroups[2]\');" checked="checked" class="input_check" />
 							</td>
 						</tr>
@@ -217,7 +214,7 @@ function template_search_members()
 							<td>
 								', $postgroup['name'], '
 							</td>
-							<td width="40" align="center">
+							<td width="40" class="centercol">
 								<input type="checkbox" name="postgroups[]" value="', $postgroup['id'], '" checked="checked" class="input_check" />
 							</td>
 						</tr>';
@@ -227,17 +224,17 @@ function template_search_members()
 							<td>
 								<em>', $txt['check_all'], '</em>
 							</td>
-							<td align="center">
+							<td class="centercol">
 								<input type="checkbox" onclick="invertAll(this, this.form, \'postgroups[]\');" checked="checked" class="input_check" />
 							</td>
 						</tr>
 					</tbody>
 				</table>
-			</div><br />
+			</div>
+			<br />
 			<input type="submit" value="', $txt['search'], '" class="button_submit" />
 		</form>
-	</div>
-	<br class="clear" />';
+	</div>';
 }
 
 function template_admin_browse()
@@ -254,7 +251,7 @@ function template_admin_browse()
 	{
 		echo '
 		<br />
-		<form action="', $scripturl, '?action=admin;area=viewmembers" method="post" accept-charset="', $context['character_set'], '" name="postFormOutstanding" id="postFormOutstanding" onsubmit="return onOutstandingSubmit();">
+		<form id="admin_form_wrapper" action="', $scripturl, '?action=admin;area=viewmembers" method="post" accept-charset="', $context['character_set'], '" name="postFormOutstanding" id="postFormOutstanding" onsubmit="return onOutstandingSubmit();">
 			<div class="cat_bar">
 				<h3 class="catbg">', $txt['admin_browse_outstanding'], '</h3>
 			</div>
@@ -282,7 +279,6 @@ function template_admin_browse()
 			// ]]></script>
 
 			<div class="windowbg">
-				<span class="topslice"><span></span></span>
 				<div class="content">
 					<dl class="settings">
 						<dt>
@@ -316,15 +312,13 @@ function template_admin_browse()
 					<input type="hidden" name="sa" value="approve" />', !empty($context['approve_list']['sort']['desc']) ? '
 					<input type="hidden" name="desc" value="1" />' : '', '
 				</div>
-				<span class="botslice"><span></span></span>
 			</div>
 			<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
 		</form>';
 	}
 
 	echo '
-	</div>
-	<br class="clear" />';
+	</div>';
 }
 
 ?>

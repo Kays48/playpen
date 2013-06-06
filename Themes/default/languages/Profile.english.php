@@ -1,5 +1,5 @@
 <?php
-// Version: 2.0; Profile
+// Version: 2.1; Profile
 
 global $scripturl, $context;
 
@@ -47,10 +47,11 @@ $txt['send_member_pm'] = 'Send this member a personal message';
 $txt['hidden'] = 'hidden';
 $txt['current_time'] = 'Current forum time';
 
+$txt['skype_username'] = 'Your Skype Username.';
+
 $txt['language'] = 'Language';
 $txt['avatar_too_big'] = 'Avatar image is too big, please resize it and try again (max';
 $txt['invalid_registration'] = 'Invalid Date Registered value, valid example:';
-$txt['msn_email_address'] = 'Your MSN messenger email address';
 $txt['current_password'] = 'Current Password';
 // Don't use entities in the below string, except the main ones. (lt, gt, quot.)
 $txt['required_security_reasons'] = 'For security reasons, your current password is required to make changes to your account.';
@@ -153,6 +154,7 @@ $txt['showPosts'] = 'Show Posts';
 $txt['showPosts_help'] = 'This section allows you to view all posts made by this member. Note that you can only see posts made in areas you currently have access to.';
 $txt['showMessages'] = 'Messages';
 $txt['showTopics'] = 'Topics';
+$txt['showDisregarded'] = 'Disregarded topics';
 $txt['showAttachments'] = 'Attachments';
 $txt['viewWarning_help'] = 'This section allows you to view all warnings issued to this member.';
 $txt['statPanel'] = 'Show Stats';
@@ -170,7 +172,6 @@ $txt['change_authentication'] = 'From this section you can change how you login 
 $txt['profileEdit'] = 'Modify Profile';
 $txt['account_info'] = 'These are your account settings. This page holds all critical information that identifies you on this forum. For security reasons, you will need to enter your (current) password to make changes to this information.';
 $txt['forumProfile_info'] = 'You can change your personal information on this page. This information will be displayed throughout ' . $context['forum_name_html_safe'] . '. If you aren\'t comfortable with sharing some information, simply skip it - nothing here is required.';
-$txt['theme'] = 'Look and Layout';
 $txt['theme_info'] = 'This section allows you to customize the look and layout of the forum.';
 $txt['notification'] = 'Notifications';
 $txt['notification_info'] = 'SMF allows you to be notified of replies to posts, newly posted topics, and forum announcements. You can change those settings here, or oversee the topics and boards you are currently receiving notifications for.';
@@ -207,7 +208,7 @@ $txt['no_errors_from_ip'] = 'No error messages from the specified IP (range) fou
 $txt['no_errors_from_user'] = 'No error messages from the specified user found';
 $txt['no_members_from_ip'] = 'No members from the specified IP (range) found';
 $txt['no_messages_from_ip'] = 'No messages from the specified IP (range) found';
-$txt['trackLogins_none_found'] = 'No recent logins where found';
+$txt['trackLogins_none_found'] = 'No recent logins were found';
 $txt['none'] = 'None';
 $txt['own_profile_confirm'] = 'Are you sure you want to delete your account?';
 $txt['view_ips_by'] = 'View IPs used by';
@@ -233,8 +234,8 @@ $txt['reminder_set_password'] = 'Set Password';
 $txt['reminder_password_set'] = 'Password successfully set';
 $txt['reminder_error'] = '%1$s failed to answer their secret question correctly when attempting to change a forgotten password.';
 
-$txt['registration_not_approved'] = 'Sorry, this account has not yet been approved. If you need to change your email address please click';
-$txt['registration_not_activated'] = 'Sorry, this account has not yet been activated. If you need to resend the activation email please click';
+$txt['registration_not_approved'] = 'Sorry, this account has not yet been approved. If you need to change your email address please click <a href="%1$s">here</a>.';
+$txt['registration_not_activated'] = 'Sorry, this account has not yet been activated. If you need to resend the activation email please click <a href="%1$s">here</a>';
 
 $txt['primary_membergroup'] = 'Primary Membergroup';
 $txt['additional_membergroups'] = 'Additional Membergroups';
@@ -290,7 +291,7 @@ $txt['display_quick_reply'] = 'Use quick reply on topic display: ';
 $txt['display_quick_reply1'] = 'don\'t show at all';
 $txt['display_quick_reply2'] = 'show, off by default';
 $txt['display_quick_reply3'] = 'show, on by default';
-$txt['display_quick_reply4'] = 'show full editor, on by default';
+$txt['use_editor_quick_reply'] = 'Use full editor in Quick Reply';
 $txt['display_quick_mod'] = 'Show quick-moderation as ';
 $txt['display_quick_mod_none'] = 'don\'t show.';
 $txt['display_quick_mod_check'] = 'checkboxes.';
@@ -312,6 +313,7 @@ $txt['show_member_topics'] = 'View Member Topics';
 $txt['show_member_attachments'] = 'View Member Attachments';
 $txt['show_posts_none'] = 'No posts have been posted yet.';
 $txt['show_topics_none'] = 'No topics have been posted yet.';
+$txt['disregarded_topics_none'] = 'You don\'t have any topic in the disregarded list.';
 $txt['show_attachments_none'] = 'No attachments have been posted yet.';
 $txt['show_attach_filename'] = 'Filename';
 $txt['show_attach_downloads'] = 'Downloads';

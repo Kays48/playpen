@@ -5,32 +5,67 @@
  *
  * @package SMF
  * @author Simple Machines http://www.simplemachines.org
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
  */
 
 if (!defined('SMF'))
-	die('Hacking attempt...');
+	die('No direct access...');
 
+/**
+ * Custom Search API class .. used when custom SMF index is used
+ */
 class custom_search
 {
-	// This is the last version of SMF that this was tested on, to protect against API changes.
+	/**
+	 *This is the last version of SMF that this was tested on, to protect against API changes.
+	 * @var type
+	 */
 	public $version_compatible = 'SMF 2.1 Alpha 1';
-	// This won't work with versions of SMF less than this.
+
+	/**
+	 *This won't work with versions of SMF less than this.
+	 * @var type
+	 */
 	public $min_smf_version = 'SMF 2.1 Alpha 1';
-	// Is it supported?
+
+	/**
+	 * Is it supported?
+	 * @var type
+	 */
 	public $is_supported = true;
 
+	/**
+	 * Index Settings
+	 * @var type
+	 */
 	protected $indexSettings = array();
-	// What words are banned?
+
+	/**
+	 * What words are banned?
+	 * @var type
+	 */
 	protected $bannedWords = array();
-	// What is the minimum word length?
+
+	/**
+	 * What is the minimum word length?
+	 * @var type
+	 */
 	protected $min_word_length = null;
-	// What databases support the custom index?
+
+	/**
+	 * What databases support the custom index?
+	 * @var type
+	 */
 	protected $supported_databases = array('mysql', 'postgresql', 'sqlite');
 
+	/**
+	 * constructor function
+	 *
+	 * @return type
+	 */
 	public function __construct()
 	{
 		global $modSettings, $db_type;
@@ -51,7 +86,13 @@ class custom_search
 		$this->min_word_length = $this->indexSettings['bytes_per_word'];
 	}
 
-	// Check whether the search can be performed by this API.
+	/**
+	 * Check whether the search can be performed by this API.
+	 *
+	 * @param type $methodName
+	 * @param type $query_params
+	 * @return boolean
+	 */
 	public function supportsMethod($methodName, $query_params = null)
 	{
 		switch ($methodName)
@@ -72,7 +113,11 @@ class custom_search
 		}
 	}
 
-	// If the settings don't exist we can't continue.
+	/**
+	 * If the settings don't exist we can't continue.
+	 *
+	 * @return type
+	 */
 	public function isValid()
 	{
 		global $modSettings;
@@ -98,7 +143,14 @@ class custom_search
 		return $y < $x ? 1 : ($y > $x ? -1 : 0);
 	}
 
-	// Do we have to do some work with the words we are searching for to prepare them?
+	/**
+	 * Do we have to do some work with the words we are searching for to prepare them?
+	 *
+	 * @param type $word
+	 * @param type $wordsSearch
+	 * @param type $wordsExclude
+	 * @param type $isExcluded
+	 */
 	public function prepareIndexes($word, &$wordsSearch, &$wordsExclude, $isExcluded)
 	{
 		global $modSettings, $smcFunc;
@@ -125,7 +177,13 @@ class custom_search
 		}
 	}
 
-	// Search for indexed words.
+	/**
+	 * Search for indexed words.
+	 *
+	 * @param type $words
+	 * @param type $search_data
+	 * @return type
+	 */
 	public function indexedWordQuery($words, $search_data)
 	{
 		global $modSettings, $smcFunc;
@@ -210,9 +268,13 @@ class custom_search
 
 		return $ignoreRequest;
 	}
-	
+
 	/**
-	 * After a post is made, we update the search index database.
+	 *  After a post is made, we update the search index database
+	 *
+	 * @param type $msgOptions
+	 * @param type $topicOptions
+	 * @param type $posterOptions
 	 */
 	public function postCreated($msgOptions, $topicOptions, $posterOptions)
 	{
@@ -235,25 +297,29 @@ class custom_search
 
 	/**
 	 * After a post is modified, we update the search index database.
+	 *
+	 * @param type $msgOptions
+	 * @param type $topicOptions
+	 * @param type $posterOptions
 	 */
 	public function postModified($msgOptions, $topicOptions, $posterOptions)
 	{
 		global $modSettings, $smcFunc;
-		
+
 		if (isset($msgOptions['body']))
 		{
 			$customIndexSettings = unserialize($modSettings['search_custom_index_config']);
 			$stopwords = empty($modSettings['search_stopwords']) ? array() : explode(',', $modSettings['search_stopwords']);
 			$old_body = isset($msgOptions['old_body']) ? $msgOptions['old_body'] : '';
-			
+
 			// create thew new and old index
 			$old_index = text2words($old_body, $customIndexSettings['bytes_per_word'], true);
 			$new_index = text2words($msgOptions['body'], $customIndexSettings['bytes_per_word'], true);
-			
+
 			// Calculate the words to be added and removed from the index.
 			$removed_words = array_diff(array_diff($old_index, $new_index), $stopwords);
 			$inserted_words = array_diff(array_diff($new_index, $old_index), $stopwords);
-			
+
 			// Delete the removed words AND the added ones to avoid key constraints.
 			if (!empty($removed_words))
 			{
@@ -285,3 +351,5 @@ class custom_search
 		}
 	}
 }
+
+?>

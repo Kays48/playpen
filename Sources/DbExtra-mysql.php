@@ -7,14 +7,14 @@
  *
  * @package SMF
  * @author Simple Machines http://www.simplemachines.org
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
  */
 
 if (!defined('SMF'))
-	die('Hacking attempt...');
+	die('No direct access...');
 
 /**
  * Add the functions implemented in this file to the $smcFunc array.
@@ -174,7 +174,7 @@ function smf_db_backup_table($table, $backup_table)
  */
 function smf_db_optimize_table($table)
 {
-	global $smcFunc, $db_name, $db_prefix;
+	global $smcFunc, $db_prefix;
 
 	$table = str_replace('{db_prefix}', $db_prefix, $table);
 
@@ -216,8 +216,9 @@ function smf_db_optimize_table($table)
 /**
  * This function lists all tables in the database.
  * The listing could be filtered according to $filter.
- * @param mixed $db, string holding the table name, or false, default false
- * @param mixed $filter, string to filter by, or false, default false
+ *
+ * @param mixed $db string holding the table name, or false, default false
+ * @param mixed $filter string to filter by, or false, default false
  * @return array, an array of table names. (strings)
  */
 function smf_db_list_tables($db = false, $filter = false)
@@ -248,40 +249,32 @@ function smf_db_list_tables($db = false, $filter = false)
 /**
  * Gets all the necessary INSERTs for the table named table_name.
  * It goes in 250 row segments.
+ *
  * @param string $tableName - the table to create the inserts for.
- * @return string, the query to insert the data back in, or an empty
- *  string if the table was empty.
+ * @param bool $new_table
+ * @return string the query to insert the data back in, or an empty string if the table was empty.
  */
 function smf_db_insert_sql($tableName, $new_table = false)
 {
-	global $smcFunc, $db_prefix, $detected_id;
-	static $start = 0, $num_rows, $fields, $limit, $last_id;
+	global $smcFunc, $db_prefix;
+	static $start = 0, $num_rows, $fields, $limit;
 
 	if ($new_table)
 	{
 		$limit = strstr($tableName, 'log_') !== false ? 500 : 250;
 		$start = 0;
-		$last_id = 0;
 	}
 
 	$data = '';
 	$tableName = str_replace('{db_prefix}', $db_prefix, $tableName);
 
-	if ($tableName != $db_prefix . 'messages' || $tableName != $db_prefix . 'topics')
-		$detected_id = 0;
-
 	// This will be handy...
 	$crlf = "\r\n";
 
-	// This is done this way because retrieve data only with LIMIT will become slower after each query
-	// and for long tables (e.g. {db_prefix}messages) it could be a pain...
-	// Instead using WHERE speeds up thing *a lot* (especially after the first 50'000 records)
 	$result = $smcFunc['db_query']('', '
 		SELECT /*!40001 SQL_NO_CACHE */ *
-		FROM `' . $tableName . '`' .
-		(!empty($last_id) && !empty($detected_id) ? '
-		WHERE ' . $detected_id . ' > ' . $last_id : '') . '
-		LIMIT ' . (empty($last_id) ? $start . ', ' : '') . $limit,
+		FROM `' . $tableName . '`
+		LIMIT ' . $start . ', ' . $limit,
 		array(
 			'security_override' => true,
 		)
@@ -318,8 +311,6 @@ function smf_db_insert_sql($tableName, $new_table = false)
 			else
 				$field_list[] = '\'' . $smcFunc['db_escape_string']($item) . '\'';
 		}
-		if (!empty($detected_id) && isset($row[$detected_id]))
-			$last_id = $row[$detected_id];
 
 		$data .= '(' . implode(', ', $field_list) . ')' . ',' . $crlf . "\t";
 	}
@@ -340,10 +331,9 @@ function smf_db_insert_sql($tableName, $new_table = false)
  */
 function smf_db_table_sql($tableName)
 {
-	global $smcFunc, $db_prefix, $detected_id;
+	global $smcFunc, $db_prefix;
 
 	$tableName = str_replace('{db_prefix}', $db_prefix, $tableName);
-	$detected_id = '';
 
 	// This will be needed...
 	$crlf = "\r\n";
@@ -386,8 +376,6 @@ function smf_db_table_sql($tableName)
 
 		// And now any extra information. (such as auto_increment.)
 		$schema_create .= ($row['Extra'] != '' ? ' ' . $row['Extra'] : '') . ',' . $crlf;
-		if ($row['Extra'] == 'auto_increment')
-			$detected_id = $row['Field'];
 	}
 	$smcFunc['db_free_result']($result);
 

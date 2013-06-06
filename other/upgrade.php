@@ -5,7 +5,7 @@
  *
  * @package SMF
  * @author Simple Machines http://www.simplemachines.org
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
@@ -13,7 +13,7 @@
 
 // Version information...
 define('SMF_VERSION', '2.1 Alpha 1');
-define('SMF_LANG_VERSION', '2.0');
+define('SMF_LANG_VERSION', '2.1');
 
 $GLOBALS['required_php_version'] = '5.1.0';
 $GLOBALS['required_mysql_version'] = '4.0.18';
@@ -69,7 +69,7 @@ $upcontext['database_step'] = 3;
 @set_time_limit(600);
 if (!ini_get('safe_mode'))
 {
-	ini_set('mysql.connect_timeout', -1); 
+	ini_set('mysql.connect_timeout', -1);
 	ini_set('default_socket_timeout', 900);
 }
 // Clean the upgrade path if this is from the client.
@@ -563,43 +563,9 @@ if (!class_exists('ftp_connection'))
 	}
 }
 
-// Have we got tracking data - if so use it (It will be clean!)
-if (isset($_GET['data']))
-{
-	$upcontext['upgrade_status'] = unserialize(base64_decode($_GET['data']));
-	$upcontext['current_step'] = $upcontext['upgrade_status']['curstep'];
-	$upcontext['language'] = $upcontext['upgrade_status']['lang'];
-	$upcontext['rid'] = $upcontext['upgrade_status']['rid'];
-	$is_debug = $upcontext['upgrade_status']['debug'];
-	$support_js = $upcontext['upgrade_status']['js'];
-
-	// Load the language.
-	if (file_exists($boarddir . '/Themes/default/languages/Install.' . $upcontext['language'] . '.php'))
-		require_once($boarddir . '/Themes/default/languages/Install.' . $upcontext['language'] . '.php');
-}
-// Set the defaults.
-else
-{
-	$upcontext['current_step'] = 0;
-	$upcontext['rid'] = mt_rand(0, 5000);
-	$upcontext['upgrade_status'] = array(
-		'curstep' => 0,
-		'lang' => isset($_GET['lang']) ? $_GET['lang'] : basename($language, '.lng'),
-		'rid' => $upcontext['rid'],
-		'pass' => 0,
-		'debug' => 0,
-		'js' => 0,
-	);
-	$upcontext['language'] = $upcontext['upgrade_status']['lang'];
-}
-
 // Don't do security check if on Yabbse
 if (!isset($modSettings['smfVersion']))
 	$disable_security = true;
-
-// If this isn't the first stage see whether they are logging in and resuming.
-if ($upcontext['current_step'] != 0 || !empty($upcontext['user']['step']))
-	checkLogin();
 
 // This only exists if we're on SMF ;)
 if (isset($modSettings['smfVersion']))
@@ -638,6 +604,40 @@ $upcontext['is_large_forum'] = (empty($modSettings['smfVersion']) || $modSetting
 $upcontext['page_title'] = isset($modSettings['smfVersion']) ? 'Updating Your SMF Install!' : 'Upgrading from YaBB SE!';
 
 $upcontext['right_to_left'] = isset($txt['lang_rtl']) ? $txt['lang_rtl'] : false;
+
+// Have we got tracking data - if so use it (It will be clean!)
+if (isset($_GET['data']))
+{
+	$upcontext['upgrade_status'] = unserialize(base64_decode($_GET['data']));
+	$upcontext['current_step'] = $upcontext['upgrade_status']['curstep'];
+	$upcontext['language'] = $upcontext['upgrade_status']['lang'];
+	$upcontext['rid'] = $upcontext['upgrade_status']['rid'];
+	$is_debug = $upcontext['upgrade_status']['debug'];
+	$support_js = $upcontext['upgrade_status']['js'];
+
+	// Load the language.
+	if (file_exists($modSettings['theme_dir'] . '/languages/Install.' . $upcontext['language'] . '.php'))
+		require_once($modSettings['theme_dir'] . '/languages/Install.' . $upcontext['language'] . '.php');
+}
+// Set the defaults.
+else
+{
+	$upcontext['current_step'] = 0;
+	$upcontext['rid'] = mt_rand(0, 5000);
+	$upcontext['upgrade_status'] = array(
+		'curstep' => 0,
+		'lang' => isset($_GET['lang']) ? $_GET['lang'] : basename($language, '.lng'),
+		'rid' => $upcontext['rid'],
+		'pass' => 0,
+		'debug' => 0,
+		'js' => 0,
+	);
+	$upcontext['language'] = $upcontext['upgrade_status']['lang'];
+}
+
+// If this isn't the first stage see whether they are logging in and resuming.
+if ($upcontext['current_step'] != 0 || !empty($upcontext['user']['step']))
+	checkLogin();
 
 if ($command_line)
 	cmdStep0();
@@ -944,7 +944,7 @@ function WelcomeLogin()
 	$upcontext['sub_template'] = 'welcome_message';
 
 	// Check for some key files - one template, one language, and a new and an old source file.
-	$check = @file_exists($boarddir . '/Themes/default/index.template.php')
+	$check = @file_exists($modSettings['theme_dir'] . '/index.template.php')
 		&& @file_exists($sourcedir . '/QueryString.php')
 		&& @file_exists($sourcedir . '/Subs-Db-' . $db_type . '.php')
 		&& @file_exists(dirname(__FILE__) . '/upgrade_2-1_' . $db_type . '.sql');
@@ -984,6 +984,9 @@ function WelcomeLogin()
 		$boarddir . '/Settings_bak.php',
 	);
 
+	require_once($sourcedir . '/Security.php');
+	$upcontext += createToken('login');
+
 	// Check the cache directory.
 	$cachedir_temp = empty($cachedir) ? $boarddir . '/cache' : $cachedir;
 	if (!file_exists($cachedir_temp))
@@ -991,11 +994,11 @@ function WelcomeLogin()
 	if (!file_exists($cachedir_temp))
 		return throw_error('The cache directory could not be found.<br /><br />Please make sure you have a directory called &quot;cache&quot; in your forum directory before continuing.');
 
-	if (!file_exists($boarddir . '/Themes/default/languages/index.' . $upcontext['language'] . '.php') && !isset($modSettings['smfVersion']) && !isset($_GET['lang']))
+	if (!file_exists($modSettings['theme_dir'] . '/languages/index.' . $upcontext['language'] . '.php') && !isset($modSettings['smfVersion']) && !isset($_GET['lang']))
 		return throw_error('The upgrader was unable to find language files for the language specified in Settings.php.<br />SMF will not work without the primary language files installed.<br /><br />Please either install them, or <a href="' . $upgradeurl . '?step=0;lang=english">use english instead</a>.');
 	elseif (!isset($_GET['skiplang']))
 	{
-		$temp = substr(@implode('', @file($boarddir . '/Themes/default/languages/index.' . $upcontext['language'] . '.php')), 0, 4096);
+		$temp = substr(@implode('', @file($modSettings['theme_dir'] . '/languages/index.' . $upcontext['language'] . '.php')), 0, 4096);
 		preg_match('~(?://|/\*)\s*Version:\s+(.+?);\s*index(?:[\s]{2}|\*/)~i', $temp, $match);
 
 		if (empty($match[1]) || $match[1] != SMF_LANG_VERSION)
@@ -1003,10 +1006,10 @@ function WelcomeLogin()
 	}
 
 	// This needs to exist!
-	if (!file_exists($boarddir . '/Themes/default/languages/Install.' . $upcontext['language'] . '.php'))
+	if (!file_exists($modSettings['theme_dir'] . '/languages/Install.' . $upcontext['language'] . '.php'))
 		return throw_error('The upgrader could not find the &quot;Install&quot; language file for the forum default language, ' . $upcontext['language'] . '.<br /><br />Please make certain you uploaded all the files included in the package, even the theme and language files for the default theme.<br />&nbsp;&nbsp;&nbsp;[<a href="' . $upgradeurl . '?lang=english">Try English</a>]');
 	else
-		require_once($boarddir . '/Themes/default/languages/Install.' . $upcontext['language'] . '.php');
+		require_once($modSettings['theme_dir'] . '/languages/Install.' . $upcontext['language'] . '.php');
 
 	if (!makeFilesWritable($writable_files))
 		return false;
@@ -1185,15 +1188,15 @@ function checkLogin()
 			$upcontext['upgrade_status']['pass'] = $upcontext['user']['pass'];
 
 			// Set the language to that of the user?
-			if (isset($user_language) && $user_language != $upcontext['language'] && file_exists($boarddir . '/Themes/default/languages/index.' . basename($user_language, '.lng') . '.php'))
+			if (isset($user_language) && $user_language != $upcontext['language'] && file_exists($modSettings['theme_dir'] . '/languages/index.' . basename($user_language, '.lng') . '.php'))
 			{
 				$user_language = basename($user_language, '.lng');
-				$temp = substr(@implode('', @file($boarddir . '/Themes/default/languages/index.' . $user_language . '.php')), 0, 4096);
+				$temp = substr(@implode('', @file($modSettings['theme_dir'] . '/languages/index.' . $user_language . '.php')), 0, 4096);
 				preg_match('~(?://|/\*)\s*Version:\s+(.+?);\s*index(?:[\s]{2}|\*/)~i', $temp, $match);
 
 				if (empty($match[1]) || $match[1] != SMF_LANG_VERSION)
 					$upcontext['upgrade_options_warning'] = 'The language files for your selected language, ' . $user_language . ', have not been updated to the latest version. Upgrade will continue with the forum default, ' . $upcontext['language'] . '.';
-				elseif (!file_exists($boarddir . '/Themes/default/languages/Install.' . basename($user_language, '.lng') . '.php'))
+				elseif (!file_exists($modSettings['theme_dir'] . '/languages/Install.' . basename($user_language, '.lng') . '.php'))
 					$upcontext['upgrade_options_warning'] = 'The language files for your selected language, ' . $user_language . ', have not been uploaded/updated as the &quot;Install&quot; language file is missing. Upgrade will continue with the forum default, ' . $upcontext['language'] . '.';
 				else
 				{
@@ -1202,7 +1205,7 @@ function checkLogin()
 					$upcontext['upgrade_status']['lang'] = $upcontext['language'];
 
 					// Include the file.
-					require_once($boarddir . '/Themes/default/languages/Install.' . $user_language . '.php');
+					require_once($modSettings['theme_dir'] . '/languages/Install.' . $user_language . '.php');
 				}
 			}
 
@@ -1284,7 +1287,7 @@ function UpgradeOptions()
 	$changes = array();
 
 	// If we're overriding the language follow it through.
-	if (isset($_GET['lang']) && file_exists($boarddir . '/Themes/default/languages/index.' . $_GET['lang'] . '.php'))
+	if (isset($_GET['lang']) && file_exists($modSettings['theme_dir'] . '/languages/index.' . $_GET['lang'] . '.php'))
 		$changes['language'] = '\'' . $_GET['lang'] . '\'';
 
 	if (!empty($_POST['maint']))
@@ -2168,7 +2171,7 @@ function changeSettings($config_vars)
 	fwrite($fp, rtrim($settingsArray[$i]));
 	fclose($fp);
 }
-function updateLastError() 
+function updateLastError()
 {
 	// clear out the db_last_error file
 	file_put_contents(dirname(__FILE__) . '/db_last_error.php', '<' . '?' . "php\n" . '$db_last_error = 0;' . "\n" . '?' . '>');
@@ -2992,7 +2995,7 @@ function cmdStep0()
 			$is_debug = true;
 		elseif ($arg == '--backup')
 			$_POST['backup'] = 1;
-		elseif ($arg == '--template' && (file_exists($boarddir . '/template.php') || file_exists($boarddir . '/template.html') && !file_exists($boarddir . '/Themes/converted')))
+		elseif ($arg == '--template' && (file_exists($boarddir . '/template.php') || file_exists($boarddir . '/template.html') && !file_exists($modSettings['theme_dir'] . '/converted')))
 			$_GET['conv'] = 1;
 		elseif ($i != 0)
 		{
@@ -3016,7 +3019,7 @@ Usage: /path/to/php -f ' . basename(__FILE__) . ' -- [OPTION]...
 	if (!empty($databases[$db_type]['alter_support']) && $smcFunc['db_query']('alter_boards', 'ALTER TABLE {db_prefix}boards ORDER BY id_board', array()) === false)
 		print_error('Error: The ' . $databases[$db_type]['name'] . ' account in Settings.php does not have sufficient privileges.', true);
 
-	$check = @file_exists($boarddir . '/Themes/default/index.template.php')
+	$check = @file_exists($modSettings['theme_dir'] . '/index.template.php')
 		&& @file_exists($sourcedir . '/QueryString.php')
 		&& @file_exists($sourcedir . '/ManageBoards.php');
 	if (!$check && !isset($modSettings['smfVersion']))
@@ -3050,10 +3053,10 @@ Usage: /path/to/php -f ' . basename(__FILE__) . ' -- [OPTION]...
 	}
 
 	// Make sure Themes is writable.
-	if (!is_writable($boarddir . '/Themes'))
-		@chmod($boarddir . '/Themes', 0777);
+	if (!is_writable($modSettings['theme_dir']))
+		@chmod($modSettings['theme_dir'], 0777);
 
-	if (!is_writable($boarddir . '/Themes') && !isset($modSettings['smfVersion']))
+	if (!is_writable($modSettings['theme_dir']) && !isset($modSettings['smfVersion']))
 		print_error('Error: Unable to obtain write access to "Themes".');
 
 	// Make sure cache directory exists and is writable!
@@ -3067,20 +3070,20 @@ Usage: /path/to/php -f ' . basename(__FILE__) . ' -- [OPTION]...
 	if (!is_writable($cachedir_temp))
 		print_error('Error: Unable to obtain write access to "cache".', true);
 
-	if (!file_exists($boarddir . '/Themes/default/languages/index.' . $upcontext['language'] . '.php') && !isset($modSettings['smfVersion']) && !isset($_GET['lang']))
+	if (!file_exists($modSettings['theme_dir'] . '/languages/index.' . $upcontext['language'] . '.php') && !isset($modSettings['smfVersion']) && !isset($_GET['lang']))
 		print_error('Error: Unable to find language files!', true);
 	else
 	{
-		$temp = substr(@implode('', @file($boarddir . '/Themes/default/languages/index.' . $upcontext['language'] . '.php')), 0, 4096);
+		$temp = substr(@implode('', @file($modSettings['theme_dir'] . '/languages/index.' . $upcontext['language'] . '.php')), 0, 4096);
 		preg_match('~(?://|/\*)\s*Version:\s+(.+?);\s*index(?:[\s]{2}|\*/)~i', $temp, $match);
 
 		if (empty($match[1]) || $match[1] != SMF_LANG_VERSION)
 			print_error('Error: Language files out of date.', true);
-		if (!file_exists($boarddir . '/Themes/default/languages/Install.' . $upcontext['language'] . '.php'))
+		if (!file_exists($modSettings['theme_dir'] . '/languages/Install.' . $upcontext['language'] . '.php'))
 			print_error('Error: Install language is missing for selected language.', true);
 
 		// Otherwise include it!
-		require_once($boarddir . '/Themes/default/languages/Install.' . $upcontext['language'] . '.php');
+		require_once($modSettings['theme_dir'] . '/languages/Install.' . $upcontext['language'] . '.php');
 	}
 
 	// Make sure we skip the HTML for login.
@@ -3465,7 +3468,7 @@ function template_upgrade_above()
 	<div id="header"><div class="frame">
 		<div id="top_section">
 			<h1 class="forumtitle">', $txt['upgrade_upgrade_utility'], '</h1>
-			<img id="smflogo" src="Themes/default/images/smflogo.png" alt="Simple Machines Forum" title="Simple Machines Forum" />
+			<img id="smflogo" src="', $settings['default_theme_url'], '/images/smflogo.png" alt="Simple Machines Forum" title="Simple Machines Forum" />
 		</div>
 		<div id="upper_section" class="middletext flow_hidden">
 			<div class="user"></div>
@@ -3639,7 +3642,8 @@ function template_welcome_message()
 		<script type="text/javascript" src="http://www.simplemachines.org/smf/current-version.js?version=' . SMF_VERSION . '"></script>
 		<script type="text/javascript" src="', $settings['default_theme_url'], '/scripts/sha1.js"></script>
 			<h3>', sprintf($txt['upgrade_ready_proceed'], SMF_VERSION), '</h3>
-	<form action="', $upcontext['form_url'], '" method="post" name="upform" id="upform" ', empty($upcontext['disable_login_hashing']) ? ' onsubmit="hashLoginPassword(this, \'' . $upcontext['rid'] . '\');"' : '', '>
+	<form action="', $upcontext['form_url'], '" method="post" name="upform" id="upform" ', empty($upcontext['disable_login_hashing']) ? ' onsubmit="hashLoginPassword(this, \'' . $upcontext['rid'] . '\', \'' . (!empty($upcontext['login_token']) ? $upcontext['login_token'] : '') . '\');"' : '', '>
+		<input type="hidden" name="', $upcontext['login_token_var'], '" value="', $upcontext['login_token'], '" />
 		<div id="version_warning" style="margin: 2ex; padding: 2ex; border: 2px dashed #a92174; color: black; background-color: #fbbbe2; display: none;">
 			<div style="float: left; width: 2ex; font-size: 2em; color: red;">!!</div>
 			<strong style="text-decoration: underline;">', $txt['upgrade_warning'], '</strong><br />
@@ -4507,7 +4511,7 @@ function template_upgrade_complete()
 					theCheck.disabled = true;
 				}
 			// ]]></script>
-			<img src="', $boardurl, '/Themes/default/images/blank.png" alt="" id="delete_upgrader" /><br />';
+			<img src="', $settings['default_theme_url'], '/images/blank.png" alt="" id="delete_upgrader" /><br />';
 
 	echo '<br />
 			If you had any problems with this upgrade, or have any problems using SMF, please don\'t hesitate to <a href="http://www.simplemachines.org/community/index.php">look to us for assistance</a>.<br />

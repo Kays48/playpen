@@ -8,25 +8,28 @@
  *
  * @package SMF
  * @author Simple Machines http://www.simplemachines.org
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
  */
 
 if (!defined('SMF'))
-	die('Hacking attempt...');
+	die('No direct access...');
 
 /**
- * handles showing the post screen, loading the post to be modified, and loading any post quoted.
+ * Handles showing the post screen, loading the post to be modified, and loading any post quoted.
+ *
  * - additionally handles previews of posts.
  * - @uses the Post template and language file, main sub template.
  * - allows wireless access using the protocol_post sub template.
  * - requires different permissions depending on the actions, but most notably post_new, post_reply_own, and post_reply_any.
  * - shows options for the editing and posting of calendar events and attachments, as well as the posting of polls.
  * - accessed from ?action=post.
+ *
+ *  @param array $post_errors holds any errors found tyring to post
  */
-function Post()
+function Post($post_errors = array())
 {
 	global $txt, $scripturl, $topic, $modSettings, $board;
 	global $user_info, $sc, $board_info, $context, $settings;
@@ -47,18 +50,6 @@ function Post()
 		fatal_lang_error('no_board', false);
 
 	require_once($sourcedir . '/Subs-Post.php');
-
-	// Any files to include for post?
-	if (!isset($post_includes) && !empty($modSettings['integrate_post_include']))
-	{
-		$post_includes = explode(',', $modSettings['integrate_post_include']);
-		foreach ($post_includes as $include)
-		{
-			$include = strtr(trim($include), array('$boarddir' => $boarddir, '$sourcedir' => $sourcedir, '$themedir' => $settings['theme_dir']));
-			if (file_exists($include))
-				require_once($include);
-		}
-	}
 
 	if (isset($_REQUEST['xml']))
 	{
@@ -86,7 +77,7 @@ function Post()
 		$smcFunc['db_free_result']($request);
 	}
 
-	// Check if it's locked.  It isn't locked if no topic is specified.
+	// Check if it's locked. It isn't locked if no topic is specified.
 	if (!empty($topic))
 	{
 		$request = $smcFunc['db_query']('', '
@@ -142,6 +133,10 @@ function Post()
 
 		$context['notify'] = !empty($context['notify']);
 		$context['sticky'] = isset($_REQUEST['sticky']) ? !empty($_REQUEST['sticky']) : $sticky;
+
+		// Check whether this is a really old post being bumped...
+		if (!empty($modSettings['oldTopicDays']) && $lastPostTime + $modSettings['oldTopicDays'] * 86400 < time() && empty($sticky) && !isset($_REQUEST['subject']))
+			$post_errors[] = array('old_topic', array($modSettings['oldTopicDays']));
 	}
 	else
 	{
@@ -175,7 +170,7 @@ function Post()
 	$context['can_quote'] = empty($modSettings['disabledBBC']) || !in_array('quote', explode(',', $modSettings['disabledBBC']));
 
 	// Generally don't show the approval box... (Assume we want things approved)
-	$context['show_approval'] = false;
+	$context['show_approval'] = allowedTo('approve_posts') && $context['becomes_approved'] ? 2 : (allowedTo('approve_posts') ? 1 : 0);
 
 	// An array to hold all the attachments for this topic.
 	$context['current_attachments'] = array();
@@ -316,9 +311,6 @@ function Post()
 		$context['event']['board'] = !empty($board) ? $board : $modSettings['cal_defaultboard'];
 	}
 
-	if (empty($context['post_errors']))
-		$context['post_errors'] = array();
-
 	// See if any new replies have come along.
 	// Huh, $_REQUEST['msg'] is set upon submit, so this doesn't get executed at submit
 	// only at preview
@@ -345,22 +337,15 @@ function Post()
 			if (!empty($context['new_replies']))
 			{
 				if ($context['new_replies'] == 1)
-					$txt['error_new_reply'] = isset($_GET['last_msg']) ? $txt['error_new_reply_reading'] : $txt['error_new_reply'];
+					$txt['error_new_replies'] = isset($_GET['last_msg']) ? $txt['error_new_reply_reading'] : $txt['error_new_reply'];
 				else
 					$txt['error_new_replies'] = sprintf(isset($_GET['last_msg']) ? $txt['error_new_replies_reading'] : $txt['error_new_replies'], $context['new_replies']);
 
-				// If they've come from the display page then we treat the error differently....
-				if (isset($_GET['last_msg']))
-					$newRepliesError = $context['new_replies'];
-				else
-					$context['post_error'][$context['new_replies'] == 1 ? 'new_reply' : 'new_replies'] = true;
+				$post_errors[] = 'new_replies';
 
 				$modSettings['topicSummaryPosts'] = $context['new_replies'] > $modSettings['topicSummaryPosts'] ? max($modSettings['topicSummaryPosts'], 5) : $modSettings['topicSummaryPosts'];
 			}
 		}
-		// Check whether this is a really old post being bumped...
-		if (!empty($modSettings['oldTopicDays']) && $lastPostTime + $modSettings['oldTopicDays'] * 86400 < time() && empty($sticky) && !isset($_REQUEST['subject']))
-			$oldTopicError = true;
 	}
 
 	// Get a response prefix (like 'Re:') in the default forum language.
@@ -384,44 +369,6 @@ function Post()
 		// Validate inputs.
 		if (empty($context['post_error']))
 		{
-			if (htmltrim__recursive(htmlspecialchars__recursive($_REQUEST['subject'])) == '')
-				$context['post_error']['no_subject'] = true;
-			if (htmltrim__recursive(htmlspecialchars__recursive($_REQUEST['message'])) == '')
-				$context['post_error']['no_message'] = true;
-			if (!empty($modSettings['max_messageLength']) && $smcFunc['strlen']($_REQUEST['message']) > $modSettings['max_messageLength'])
-				$context['post_error']['long_message'] = true;
-
-			// Are you... a guest?
-			if ($user_info['is_guest'])
-			{
-				$_REQUEST['guestname'] = !isset($_REQUEST['guestname']) ? '' : trim($_REQUEST['guestname']);
-				$_REQUEST['email'] = !isset($_REQUEST['email']) ? '' : trim($_REQUEST['email']);
-
-				// Validate the name and email.
-				if (!isset($_REQUEST['guestname']) || trim(strtr($_REQUEST['guestname'], '_', ' ')) == '')
-					$context['post_error']['no_name'] = true;
-				elseif ($smcFunc['strlen']($_REQUEST['guestname']) > 25)
-					$context['post_error']['long_name'] = true;
-				else
-				{
-					require_once($sourcedir . '/Subs-Members.php');
-					if (isReservedName(htmlspecialchars($_REQUEST['guestname']), 0, true, false))
-						$context['post_error']['bad_name'] = true;
-				}
-
-				if (empty($modSettings['guest_post_no_email']))
-				{
-					if (!isset($_REQUEST['email']) || $_REQUEST['email'] == '')
-						$context['post_error']['no_email'] = true;
-					elseif (preg_match('~^[0-9A-Za-z=_+\-/][0-9A-Za-z=_\'+\-/\.]*@[\w\-]+(\.[\w\-]+)*(\.[\w]{2,6})$~', $_REQUEST['email']) == 0)
-						$context['post_error']['bad_email'] = true;
-				}
-			}
-
-			// This is self explanatory - got any questions?
-			if (isset($_REQUEST['question']) && trim($_REQUEST['question']) == '')
-				$context['post_error']['no_question'] = true;
-
 			// This means they didn't click Post and get an error.
 			$really_previewing = true;
 		}
@@ -450,34 +397,6 @@ function Post()
 		// Make sure the subject isn't too long - taking into account special characters.
 		if ($smcFunc['strlen']($form_subject) > 100)
 			$form_subject = $smcFunc['substr']($form_subject, 0, 100);
-
-		// Have we inadvertently trimmed off the subject of useful information?
-		if ($smcFunc['htmltrim']($form_subject) === '')
-			$context['post_error']['no_subject'] = true;
-
-		// Any errors occurred?
-		if (!empty($context['post_error']))
-		{
-			loadLanguage('Errors');
-
-			$context['error_type'] = 'minor';
-
-			$context['post_error']['messages'] = array();
-			foreach ($context['post_error'] as $post_error => $dummy)
-			{
-				if ($post_error == 'messages')
-					continue;
-
-				if ($post_error == 'long_message')
-					$txt['error_' . $post_error] = sprintf($txt['error_' . $post_error], $modSettings['max_messageLength']);
-
-				$context['post_error']['messages'][] = $txt['error_' . $post_error];
-
-				// If it's not a minor error flag it as such.
-				if (!in_array($post_error, array('new_reply', 'not_approved', 'new_replies', 'old_topic', 'need_qr_verification', 'no_subject')))
-					$context['error_type'] = 'serious';
-			}
-		}
 
 		if (isset($_REQUEST['poll']))
 		{
@@ -536,7 +455,7 @@ function Post()
 		}
 
 		// Only show the preview stuff if they hit Preview.
-		if ($really_previewing == true || isset($_REQUEST['xml']))
+		if (($really_previewing == true || isset($_REQUEST['xml'])) && !isset($_REQUEST['save_draft']))
 		{
 			// Set up the preview message and subject and censor them...
 			$context['preview_message'] = $form_message;
@@ -581,16 +500,18 @@ function Post()
 					m.poster_name, m.poster_email, m.subject, m.icon, m.approved,
 					IFNULL(a.size, -1) AS filesize, a.filename, a.id_attach,
 					a.approved AS attachment_approved, t.id_member_started AS id_member_poster,
-					m.poster_time
-			FROM {db_prefix}messages AS m
+					m.poster_time, log.id_action
+				FROM {db_prefix}messages AS m
 					INNER JOIN {db_prefix}topics AS t ON (t.id_topic = {int:current_topic})
 					LEFT JOIN {db_prefix}attachments AS a ON (a.id_msg = m.id_msg AND a.attachment_type = {int:attachment_type})
+					LEFT JOIN {db_prefix}log_actions AS log ON (m.id_topic = log.id_topic AND log.action = {string:announce_action})
 				WHERE m.id_msg = {int:id_msg}
 					AND m.id_topic = {int:current_topic}',
 				array(
 					'current_topic' => $topic,
 					'attachment_type' => 0,
 					'id_msg' => $_REQUEST['msg'],
+					'announce_action' => 'announce_topic',
 				)
 			);
 			// The message they were trying to edit was most likely deleted.
@@ -618,6 +539,12 @@ function Post()
 				isAllowedTo('modify_replies');
 			else
 				isAllowedTo('modify_any');
+
+			if ($context['can_announce'] && !empty($row['id_action']))
+			{
+				loadLanguage('Errors');
+				$context['post_error']['messages'][] = $txt['error_topic_already_announced'];
+			}
 
 			if (!empty($modSettings['attachmentEnable']))
 			{
@@ -683,26 +610,27 @@ function Post()
 		// Get the existing message.
 		$request = $smcFunc['db_query']('', '
 			SELECT
-				m.id_member, m.modified_time, m.smileys_enabled, m.body,
+				m.id_member, m.modified_time, m.modified_name, m.smileys_enabled, m.body,
 				m.poster_name, m.poster_email, m.subject, m.icon, m.approved,
 				IFNULL(a.size, -1) AS filesize, a.filename, a.id_attach,
 				a.approved AS attachment_approved, t.id_member_started AS id_member_poster,
-				m.poster_time
+				m.poster_time, log.id_action
 			FROM {db_prefix}messages AS m
 				INNER JOIN {db_prefix}topics AS t ON (t.id_topic = {int:current_topic})
 				LEFT JOIN {db_prefix}attachments AS a ON (a.id_msg = m.id_msg AND a.attachment_type = {int:attachment_type})
+					LEFT JOIN {db_prefix}log_actions AS log ON (m.id_topic = log.id_topic AND log.action = {string:announce_action})
 			WHERE m.id_msg = {int:id_msg}
 				AND m.id_topic = {int:current_topic}',
 			array(
 				'current_topic' => $topic,
 				'attachment_type' => 0,
 				'id_msg' => $_REQUEST['msg'],
+				'announce_action' => 'announce_topic',
 			)
 		);
 		// The message they were trying to edit was most likely deleted.
-		//@todo Change this error message?
 		if ($smcFunc['db_num_rows']($request) == 0)
-			fatal_lang_error('no_board', false);
+			fatal_lang_error('no_message', false);
 		$row = $smcFunc['db_fetch_assoc']($request);
 
 		$attachment_stuff = array($row);
@@ -725,9 +653,18 @@ function Post()
 		else
 			isAllowedTo('modify_any');
 
+		if ($context['can_announce'] && !empty($row['id_action']))
+		{
+			loadLanguage('Errors');
+			$context['post_error']['messages'][] = $txt['error_topic_already_announced'];
+		}
+
 		// When was it last modified?
 		if (!empty($row['modified_time']))
+		{
 			$context['last_modified'] = timeformat($row['modified_time']);
+			$context['last_modified_text'] = sprintf($txt['last_edit_by'], $context['last_modified'], $row['modified_name']);
+		}
 
 		// Get the stuff ready for the form.
 		$form_subject = $row['subject'];
@@ -895,7 +832,7 @@ function Post()
 						if (file_exists($attachment['tmp_name']))
 							unlink($attachment['tmp_name']);
 				}
-				$context['post_error']['messages'][] = $txt['error_temp_attachments_gone'];
+				$post_errors[] = 'temp_attachments_gone';
 				$_SESSION['temp_attachments'] = array();
 			}
 			// Hmm, coming in fresh and there are files in session.
@@ -912,7 +849,7 @@ function Post()
 
 						if (file_exists($attachment['tmp_name']))
 						{
-							$context['post_error']['messages'][] = $txt['error_temp_attachments_new'];
+							$post_errors[] = 'temp_attachments_new';
 							$context['files_in_session_warning'] = $txt['attached_files_in_session'];
 							unset($_SESSION['temp_attachments']['post']['files']);
 							break;
@@ -923,9 +860,9 @@ function Post()
 				{
 					// Since, they don't belong here. Let's inform the user that they exist..
 					if (!empty($topic))
-						$delete_link = '<a href="' . $scripturl . '?action=post' .(!empty($_REQUEST['msg']) ? (';msg=' . $_REQUEST['msg']) : '') . (!empty($_REQUEST['last_msg']) ? (';last_msg=' . $_REQUEST['last_msg']) : '') . ';topic=' . $topic . ';delete_temp">' . $txt['here'] . '</a>';
+						$delete_url = $scripturl . '?action=post' .(!empty($_REQUEST['msg']) ? (';msg=' . $_REQUEST['msg']) : '') . (!empty($_REQUEST['last_msg']) ? (';last_msg=' . $_REQUEST['last_msg']) : '') . ';topic=' . $topic . ';delete_temp';
 					else
-						$delete_link = '<a href="' . $scripturl . '?action=post;board=' . $board . ';delete_temp">' . $txt['here'] . '</a>';
+						$delete_url = $scripturl . '?action=post;board=' . $board . ';delete_temp';
 
 					// Compile a list of the files to show the user.
 					$file_list = array();
@@ -939,21 +876,21 @@ function Post()
 					if (!empty($_SESSION['temp_attachments']['post']['msg']))
 					{
 						// We have a message id, so we can link back to the old topic they were trying to edit..
-						$goback_link = '<a href="' . $scripturl . '?action=post' .(!empty($_SESSION['temp_attachments']['post']['msg']) ? (';msg=' . $_SESSION['temp_attachments']['post']['msg']) : '') . (!empty($_SESSION['temp_attachments']['post']['last_msg']) ? (';last_msg=' . $_SESSION['temp_attachments']['post']['last_msg']) : '') . ';topic=' . $_SESSION['temp_attachments']['post']['topic'] . ';additionalOptions">' . $txt['here'] . '</a>';
+						$goback_url = $scripturl . '?action=post' .(!empty($_SESSION['temp_attachments']['post']['msg']) ? (';msg=' . $_SESSION['temp_attachments']['post']['msg']) : '') . (!empty($_SESSION['temp_attachments']['post']['last_msg']) ? (';last_msg=' . $_SESSION['temp_attachments']['post']['last_msg']) : '') . ';topic=' . $_SESSION['temp_attachments']['post']['topic'] . ';additionalOptions';
 
-						$context['post_error']['messages'][] = vsprintf($txt['error_temp_attachments_found'], array($delete_link, $goback_link, $file_list));
+						$post_errors[] = array('temp_attachments_found', array($delete_url, $goback_url, $file_list));
 						$context['ignore_temp_attachments'] = true;
 					}
 					else
 					{
-						$context['post_error']['messages'][] = vsprintf($txt['error_temp_attachments_lost'], array($delete_link, $file_list));
+						$post_errors[] = array('temp_attachments_lost', array($delete_url, $file_list));
 						$context['ignore_temp_attachments'] = true;
 					}
 				}
 			}
 
 			if (!empty($context['we_are_history']))
-				$context['post_error']['messages'][] = '<br />' . $context['we_are_history'];
+				$post_errors[] = $context['we_are_history'];
 
 			foreach ($_SESSION['temp_attachments'] as $attachID => $attachment)
 			{
@@ -965,7 +902,8 @@ function Post()
 
 				if ($attachID == 'initial_error')
 				{
-					$context['post_error']['messages'][] = '<br />' . $txt['attach_no_upload'] . '<div style="padding: 0 1em;">' . (is_array($attachment) ? vsprintf($txt[$attachment[0]], $attachment[1]) : $txt[$attachment]) . '</div>';
+					$txt['error_attach_initial_error'] = $txt['attach_no_upload'] . '<div style="padding: 0 1em;">' . (is_array($attachment) ? vsprintf($txt[$attachment[0]], $attachment[1]) : $txt[$attachment]) . '</div>';
+					$post_errors[] = 'attach_initial_error';
 					unset($_SESSION['temp_attachments']);
 					break;
 				}
@@ -973,12 +911,12 @@ function Post()
 				// Show any errors which might of occured.
 				if (!empty($attachment['errors']))
 				{
-					$errors = empty($errors) ? '<br />' : '';
-					$errors .= vsprintf($txt['attach_warning'], $attachment['name']) . '<div style="padding: 0 1em;">';
-					foreach($attachment['errors'] as $error)
-						$errors .= (is_array($error) ? vsprintf($txt[$error[0]], $error[1]) : $txt[$error]) . '<br  />';
-					$errors .= '</div>';
-					$context['post_error']['messages'][] = $errors;
+					$txt['error_attach_errors'] = empty($txt['error_attach_errors']) ? '<br />' : '';
+					$txt['error_attach_errors'] .= vsprintf($txt['attach_warning'], $attachment['name']) . '<div style="padding: 0 1em;">';
+					foreach ($attachment['errors'] as $error)
+						$txt['error_attach_errors'] .= (is_array($error) ? vsprintf($txt[$error[0]], $error[1]) : $txt[$error]) . '<br  />';
+					$txt['error_attach_errors'] .= '</div>';
+					$post_errors[] = 'attach_errors';
 
 					// Take out the trash.
 					unset($_SESSION['temp_attachments'][$attachID]);
@@ -1010,23 +948,58 @@ function Post()
 		}
 	}
 
-	if (!empty($context['post_error']['messages']) && (isset($newRepliesError) || isset($oldTopicError)))
-		$context['post_error']['messages'][] = '<br />';
-
-	// If we are coming here to make a reply, and someone has already replied... make a special warning message.
-	if (isset($newRepliesError))
+	// Do we need to show the visual verification image?
+	$context['require_verification'] = !$user_info['is_mod'] && !$user_info['is_admin'] && !empty($modSettings['posts_require_captcha']) && ($user_info['posts'] < $modSettings['posts_require_captcha'] || ($user_info['is_guest'] && $modSettings['posts_require_captcha'] == -1));
+	if ($context['require_verification'])
 	{
-		$context['post_error']['messages'][] = $newRepliesError == 1 ? $txt['error_new_reply'] : $txt['error_new_replies'];
-		$context['error_type'] = 'minor';
+		require_once($sourcedir . '/Subs-Editor.php');
+		$verificationOptions = array(
+			'id' => 'post',
+		);
+		$context['require_verification'] = create_control_verification($verificationOptions);
+		$context['visual_verification_id'] = $verificationOptions['id'];
 	}
 
-	if (isset($oldTopicError))
+	// If they came from quick reply, and have to enter verification details, give them some notice.
+	if (!empty($_REQUEST['from_qr']) && !empty($context['require_verification']))
+		$post_errors[] = 'need_qr_verification';
+
+	/*
+	 * There are two error types: serious and miinor. Serious errors
+	 * actually tell the user that a real error has occurred, while minor
+	 * errors are like warnings that let them know that something with
+	 * their post isn't right.
+	 */
+	$minor_errors = array('not_approved', 'new_replies', 'old_topic', 'need_qr_verification', 'no_subject');
+
+	call_integration_hook('integrate_post_errors', array(&$post_errors, &$minor_errors));
+
+	// Any errors occurred?
+	if (!empty($post_errors))
 	{
-		$context['post_error']['messages'][] = sprintf($txt['error_old_topic'], $modSettings['oldTopicDays']);
+		loadLanguage('Errors');
 		$context['error_type'] = 'minor';
+		foreach ($post_errors as $post_error)
+			if (is_array($post_error))
+			{
+				$post_error_id = $post_error[0];
+				$context['post_error'][$post_error_id] = vsprintf($txt['error_' . $post_error_id], $post_error[1]);
+
+				// If it's not a minor error flag it as such.
+				if (!in_array($post_error_id, $minor_errors))
+					$context['error_type'] = 'serious';
+			}
+			else
+			{
+				$context['post_error'][$post_error] = $txt['error_' . $post_error];
+
+				// If it's not a minor error flag it as such.
+				if (!in_array($post_error, $minor_errors))
+					$context['error_type'] = 'serious';
+			}
 	}
 
-	// What are you doing?  Posting a poll, modifying, previewing, new post, or reply...
+	// What are you doing? Posting a poll, modifying, previewing, new post, or reply...
 	if (isset($_REQUEST['poll']))
 		$context['page_title'] = $txt['new_poll'];
 	elseif ($context['make_event'])
@@ -1060,6 +1033,17 @@ function Post()
 	$context['subject'] = addcslashes($form_subject, '"');
 	$context['message'] = str_replace(array('"', '<', '>', '&nbsp;'), array('&quot;', '&lt;', '&gt;', ' '), $form_message);
 
+	// Are post drafts enabled?
+	$context['drafts_save'] = !empty($modSettings['drafts_enabled']) && !empty($modSettings['drafts_post_enabled']) && allowedTo('post_draft');
+	$context['drafts_autosave'] = !empty($context['drafts_save']) && !empty($modSettings['drafts_autosave_enabled']) && allowedTo('post_autosave_draft');
+
+	// Build a list of drafts that they can load in to the editor
+	if (!empty($context['drafts_save']))
+	{
+		require_once($sourcedir . '/Drafts.php');
+		ShowDrafts($user_info['id'], $topic);
+	}
+
 	// Needed for the editor and message icons.
 	require_once($sourcedir . '/Subs-Editor.php');
 
@@ -1071,7 +1055,7 @@ function Post()
 			'post_button' => $context['submit_label'],
 		),
 		// add height and width for the editor
-		'height' => '175px',
+		'height' => '275px',
 		'width' => '100%',
 		// We do XML preview here.
 		'preview_type' => 2,
@@ -1154,25 +1138,6 @@ function Post()
 	$context['is_new_post'] = !isset($_REQUEST['msg']);
 	$context['is_first_post'] = $context['is_new_topic'] || (isset($_REQUEST['msg']) && $_REQUEST['msg'] == $id_first_msg);
 
-	// Do we need to show the visual verification image?
-	$context['require_verification'] = !$user_info['is_mod'] && !$user_info['is_admin'] && !empty($modSettings['posts_require_captcha']) && ($user_info['posts'] < $modSettings['posts_require_captcha'] || ($user_info['is_guest'] && $modSettings['posts_require_captcha'] == -1));
-	if ($context['require_verification'])
-	{
-		require_once($sourcedir . '/Subs-Editor.php');
-		$verificationOptions = array(
-			'id' => 'post',
-		);
-		$context['require_verification'] = create_control_verification($verificationOptions);
-		$context['visual_verification_id'] = $verificationOptions['id'];
-	}
-
-	// If they came from quick reply, and have to enter verification details, give them some notice.
-	if (!empty($_REQUEST['from_qr']) && !empty($context['require_verification']))
-	{
-		$context['post_error']['messages'][] = $txt['enter_verification_details'];
-		$context['error_type'] = 'minor';
-	}
-
 	// WYSIWYG only works if BBC is enabled
 	$modSettings['disable_wysiwyg'] = !empty($modSettings['disable_wysiwyg']) || empty($modSettings['enableBBC']);
 
@@ -1187,7 +1152,8 @@ function Post()
 }
 
 /**
- * actually posts or saves the message composed with Post().
+ * Posts or saves the message composed with Post().
+ *
  * requires various permissions depending on the action.
  * handles attachment, post, and calendar saving.
  * sends off notifications, and allows for announcements and moderation.
@@ -1211,32 +1177,6 @@ function Post2()
 
 	// No need!
 	$context['robot_no_index'] = true;
-
-	// Any files to include for post?
-	if (!empty($modSettings['integrate_post_include']))
-	{
-		$post_includes = explode(',', $modSettings['integrate_post_include']);
-		foreach ($post_includes as $include)
-		{
-			$include = strtr(trim($include), array('$boarddir' => $boarddir, '$sourcedir' => $sourcedir, '$themedir' => $settings['theme_dir']));
-			if (file_exists($include))
-				require_once($include);
-		}
-	}
-
-	// If we came from WYSIWYG then turn it back into BBC regardless.
-	if (!empty($_REQUEST['message_mode']) && isset($_REQUEST['message']))
-	{
-		require_once($sourcedir . '/Subs-Editor.php');
-
-		$_REQUEST['message'] = html_to_bbc($_REQUEST['message']);
-
-		// We need to unhtml it now as it gets done shortly.
-		$_REQUEST['message'] = un_htmlspecialchars($_REQUEST['message']);
-
-		// We need this for everything else.
-		$_POST['message'] = $_REQUEST['message'];
-	}
 
 	// Previewing? Go back to start.
 	if (isset($_REQUEST['preview']))
@@ -1267,6 +1207,10 @@ function Post2()
 	require_once($sourcedir . '/Subs-Post.php');
 	loadLanguage('Post');
 
+	// Drafts enabled and needed?
+	if (!empty($modSettings['drafts_enabled']) && (isset($_POST['save_draft']) || isset($_POST['id_draft'])))
+		require_once($sourcedir . '/Drafts.php');
+
 	// First check to see if they are trying to delete any current attachments.
 	if (isset($_POST['attach_del']))
 	{
@@ -1279,7 +1223,7 @@ function Post2()
 				$keep_ids[] = (int) $dummy;
 
 		if (isset($_SESSION['temp_attachments']))
-			foreach($_SESSION['temp_attachments'] as $attachID => $attachment)
+			foreach ($_SESSION['temp_attachments'] as $attachID => $attachment)
 			{
 				if ((isset($_SESSION['temp_attachments']['post']['files'], $attachment['name']) && in_array($attachment['name'], $_SESSION['temp_attachments']['post']['files'])) || in_array($attachID, $keep_temp) || strpos($attachID, 'post_tmp_' . $user_info['id']) === false)
 					continue;
@@ -1304,10 +1248,9 @@ function Post2()
 	$context['can_post_attachment'] = !empty($modSettings['attachmentEnable']) && $modSettings['attachmentEnable'] == 1 && (allowedTo('post_attachment') || ($modSettings['postmod_active'] && allowedTo('post_unapproved_attachments')));
 	if ($context['can_post_attachment'] && empty($_POST['from_qr']))
 	{
-		 require_once($sourcedir . '/Attachments.php');
+		 require_once($sourcedir . '/Subs-Attachments.php');
 		 processAttachments();
 	}
-
 
 	// If this isn't a new topic load the topic info that we need.
 	if (!empty($topic))
@@ -1387,6 +1330,13 @@ function Post2()
 		if (isset($_POST['sticky']) && (empty($modSettings['enableStickyTopics']) || $_POST['sticky'] == $topic_info['is_sticky'] || !allowedTo('make_sticky')))
 			unset($_POST['sticky']);
 
+		// If drafts are enabled, then pass this off
+		if (!empty($modSettings['drafts_enabled']) && isset($_POST['save_draft']))
+		{
+			SaveDraft($post_errors);
+			return Post();
+		}
+
 		// If the number of replies has changed, if the setting is enabled, go back to Post() - which handles the error.
 		if (empty($options['no_new_reply_warning']) && isset($_POST['last_msg']) && $topic_info['id_last_msg'] > $_POST['last_msg'])
 		{
@@ -1424,6 +1374,13 @@ function Post2()
 
 		if (isset($_POST['sticky']) && (empty($modSettings['enableStickyTopics']) || empty($_POST['sticky']) || !allowedTo('make_sticky')))
 			unset($_POST['sticky']);
+
+		// Saving your new topic as a draft first?
+		if (!empty($modSettings['drafts_enabled']) && isset($_POST['save_draft']))
+		{
+			SaveDraft($post_errors);
+			return Post();
+		}
 
 		$posterIsGuest = $user_info['is_guest'];
 	}
@@ -1501,6 +1458,13 @@ function Post2()
 				$moderationAction = true;
 		}
 
+		// If drafts are enabled, then lets send this off to save
+		if (!empty($modSettings['drafts_enabled']) && isset($_POST['save_draft']))
+		{
+			SaveDraft($post_errors);
+			return Post();
+		}
+
 		$posterIsGuest = empty($row['id_member']);
 
 		// Can they approve it?
@@ -1513,6 +1477,13 @@ function Post2()
 			$_POST['guestname'] = $row['poster_name'];
 			$_POST['email'] = $row['poster_email'];
 		}
+	}
+
+	// Incase we want to override
+	if (allowedTo('approve_posts'))
+	{
+		$becomesApproved = !isset($_REQUEST['approve']) || !empty($_REQUEST['approve']) ? 1 : 0;
+		$approve_has_changed = isset($row['approved']) ? $row['approved'] != $becomesApproved : false;
 	}
 
 	// If the poster is a guest evaluate the legality of name and email.
@@ -1555,7 +1526,7 @@ function Post2()
 	if (!isset($_POST['message']) || $smcFunc['htmltrim']($smcFunc['htmlspecialchars']($_POST['message']), ENT_QUOTES) === '')
 		$post_errors[] = 'no_message';
 	elseif (!empty($modSettings['max_messageLength']) && $smcFunc['strlen']($_POST['message']) > $modSettings['max_messageLength'])
-		$post_errors[] = 'long_message';
+		$post_errors[] = array('long_message', array($modSettings['max_messageLength']));
 	else
 	{
 		// Prepare the message a bit for some additional testing.
@@ -1626,21 +1597,10 @@ function Post2()
 	// Any mistakes?
 	if (!empty($post_errors))
 	{
-		loadLanguage('Errors');
 		// Previewing.
 		$_REQUEST['preview'] = true;
 
-		$context['post_error'] = array('messages' => array());
-		foreach ($post_errors as $post_error)
-		{
-			$context['post_error'][$post_error] = true;
-			if ($post_error == 'long_message')
-				$txt['error_' . $post_error] = sprintf($txt['error_' . $post_error], $modSettings['max_messageLength']);
-
-			$context['post_error']['messages'][] = $txt['error_' . $post_error];
-		}
-
-		return Post();
+		return Post($post_errors);
 	}
 
 	// Make sure the user isn't spamming the board.
@@ -1704,7 +1664,6 @@ function Post2()
 		$_POST['question'] = preg_replace('~&amp;#(\d{4,5}|[2-9]\d{2,4}|1[2-9]\d);~', '&#$1;', $_POST['question']);
 		$_POST['options'] = htmlspecialchars__recursive($_POST['options']);
 	}
-
 
 	// ...or attach a new file...
 	if (empty($ignore_temp) && $context['can_post_attachment'] && !empty($_SESSION['temp_attachments']) && empty($_POST['from_qr']))
@@ -1870,6 +1829,10 @@ function Post2()
 		if (isset($topicOptions['id']))
 			$topic = $topicOptions['id'];
 	}
+
+	// If we had a draft for this, its time to remove it since it was just posted
+	if (!empty($modSettings['drafts_enabled']) && !empty($_POST['id_draft']))
+		DeleteDraft($_POST['id_draft']);
 
 	// Editing or posting an event?
 	if (isset($_POST['calendar']) && (!isset($_REQUEST['eventid']) || $_REQUEST['eventid'] == -1))
@@ -2068,7 +2031,7 @@ function Post2()
 		$context['linktree'][] = array(
 			'url' => $scripturl . '?topic=' . $topic . '.0',
 			'name' => $_POST['subject'],
-			'extra_before' => $settings['linktree_inline'] ? $txt['topic'] . ': ' : ''
+			'extra_before' => !empty($settings['linktree_inline']) ? $txt['topic'] . ': ' : ''
 		);
 
 		if (isset($_REQUEST['msg']))
@@ -2092,7 +2055,8 @@ function Post2()
 }
 
 /**
- * handle the announce topic function (action=announce).
+ * Handle the announce topic function (action=announce).
+ *
  * checks the topic announcement permissions and loads the announcement template.
  * requires the announce_topic permission.
  * uses the ManageMembers template and Post language file.
@@ -2125,6 +2089,7 @@ function AnnounceTopic()
 
 /**
  * Allow a user to chose the membergroups to send the announcement to.
+ *
  * lets the user select the membergroups that will receive the topic announcement.
  */
 function AnnouncementSelectMembergroup()
@@ -2203,6 +2168,7 @@ function AnnouncementSelectMembergroup()
 
 /**
  * Send the announcement in chunks.
+ *
  * splits the members to be sent a topic announcement into chunks.
  * composes notification messages in all languages needed.
  * does the actual sending of the topic announcements in chunks.
@@ -2214,9 +2180,6 @@ function AnnouncementSend()
 	global $language, $scripturl, $txt, $user_info, $sourcedir, $smcFunc;
 
 	checkSession();
-
-	// @todo Might need an interface?
-	$chunkSize = empty($modSettings['mail_queue']) ? 50 : 500;
 
 	$context['start'] = empty($_REQUEST['start']) ? 0 : (int) $_REQUEST['start'];
 	$groups = array_merge($board_info['groups'], array(1));
@@ -2257,26 +2220,27 @@ function AnnouncementSend()
 	$request = $smcFunc['db_query']('', '
 		SELECT mem.id_member, mem.email_address, mem.lngfile
 		FROM {db_prefix}members AS mem
-		WHERE mem.id_member != {int:current_member}' . (!empty($modSettings['allow_disableAnnounce']) ? '
+		WHERE (mem.id_group IN ({array_int:group_list}) OR mem.id_post_group IN ({array_int:group_list}) OR FIND_IN_SET({raw:additional_group_list}, mem.additional_groups) != 0)' . (!empty($modSettings['allow_disableAnnounce']) ? '
 			AND mem.notify_announcements = {int:notify_announcements}' : '') . '
 			AND mem.is_activated = {int:is_activated}
-			AND (mem.id_group IN ({array_int:group_list}) OR mem.id_post_group IN ({array_int:group_list}) OR FIND_IN_SET({raw:additional_group_list}, mem.additional_groups) != 0)
 			AND mem.id_member > {int:start}
 		ORDER BY mem.id_member
-		LIMIT ' . $chunkSize,
+		LIMIT {int:chunk_size}',
 		array(
-			'current_member' => $user_info['id'],
 			'group_list' => $_POST['who'],
 			'notify_announcements' => 1,
 			'is_activated' => 1,
 			'start' => $context['start'],
 			'additional_group_list' => implode(', mem.additional_groups) != 0 OR FIND_IN_SET(', $_POST['who']),
+			// @todo Might need an interface?
+			'chunk_size' => empty($modSettings['mail_queue']) ? 50 : 500,
 		)
 	);
 
 	// All members have received a mail. Go to the next screen.
 	if ($smcFunc['db_num_rows']($request) == 0)
 	{
+		logAction('announce_topic', array('topic' => $topic), 'user');
 		if (!empty($_REQUEST['move']) && allowedTo('move_any'))
 			redirectexit('action=movetopic;topic=' . $topic . '.0' . (empty($_REQUEST['goback']) ? '' : ';goback'));
 		elseif (!empty($_REQUEST['goback']))
@@ -2331,8 +2295,8 @@ function AnnouncementSend()
 }
 
 /**
- * notifies members who have requested notification for new topics
- * * posted on a board of said posts.
+ * Notifies members who have requested notification for new topics posted on a board of said posts.
+ *
  * receives data on the topics to send out notifications to by the passed in array.
  * only sends notifications to those who can *currently* see the topic (it doesn't matter if they could when they requested notification.)
  * loads the Post language file multiple times for each language if the userLanguage setting is set.
@@ -2490,6 +2454,7 @@ function notifyMembersBoard(&$topicData)
 
 /**
  * Get the topic for display purposes.
+ *
  * gets a summary of the most recent posts in a topic.
  * depends on the topicSummaryPosts setting.
  * if you are editing a post, only shows posts previous to that post.
@@ -2549,7 +2514,7 @@ function getTopic()
 }
 
 /**
- * loads a post an inserts it into the current editing text box.
+ * Loads a post an inserts it into the current editing text box.
  * uses the Post language file.
  * uses special (sadly browser dependent) javascript to parse entities for internationalization reasons.
  * accessed with ?action=quotefast.
@@ -2624,16 +2589,7 @@ function QuoteFast()
 		if (!empty($modSettings['removeNestedQuotes']))
 			$row['body'] = preg_replace(array('~\n?\[quote.*?\].+?\[/quote\]\n?~is', '~^\n~', '~\[/quote\]~'), '', $row['body']);
 
-		// Make the body HTML if need be.
-		if (!empty($_REQUEST['mode']))
-		{
-			require_once($sourcedir . '/Subs-Editor.php');
-			$row['body'] = strtr($row['body'], array('&lt;' => '#smlt#', '&gt;' => '#smgt#', '&amp;' => '#smamp#'));
-			$row['body'] = bbc_to_html($row['body']);
-			$lb = '<br />';
-		}
-		else
-			$lb = "\n";
+		$lb = "\n";
 
 		// Add a quote string on the front and end.
 		$context['quote']['xml'] = '[quote author=' . $row['poster_name'] . ' link=topic=' . $row['id_topic'] . '.msg' . (int) $_REQUEST['quote'] . '#msg' . (int) $_REQUEST['quote'] . ' date=' . $row['poster_time'] . ']' . $lb . $row['body'] . $lb . '[/quote]';
@@ -2661,6 +2617,10 @@ function QuoteFast()
 		);
 }
 
+/**
+ * Used to edit the body or subject of a message inline
+ * called from action=jsmodify from script and topic js
+ */
 function JavaScriptModify()
 {
 	global $sourcedir, $modSettings, $board, $topic, $txt;
@@ -2675,24 +2635,24 @@ function JavaScriptModify()
 
 	// Assume the first message if no message ID was given.
 	$request = $smcFunc['db_query']('', '
-			SELECT
-				t.locked, t.num_replies, t.id_member_started, t.id_first_msg,
-				m.id_msg, m.id_member, m.poster_time, m.subject, m.smileys_enabled, m.body, m.icon,
-				m.modified_time, m.modified_name, m.approved
-			FROM {db_prefix}messages AS m
-				INNER JOIN {db_prefix}topics AS t ON (t.id_topic = {int:current_topic})
-			WHERE m.id_msg = {raw:id_msg}
-				AND m.id_topic = {int:current_topic}' . (allowedTo('modify_any') || allowedTo('approve_posts') ? '' : (!$modSettings['postmod_active'] ? '
-				AND (m.id_member != {int:guest_id} AND m.id_member = {int:current_member})' : '
-				AND (m.approved = {int:is_approved} OR (m.id_member != {int:guest_id} AND m.id_member = {int:current_member}))')),
-			array(
-				'current_member' => $user_info['id'],
-				'current_topic' => $topic,
-				'id_msg' => empty($_REQUEST['msg']) ? 't.id_first_msg' : (int) $_REQUEST['msg'],
-				'is_approved' => 1,
-				'guest_id' => 0,
-			)
-		);
+		SELECT
+			t.locked, t.num_replies, t.id_member_started, t.id_first_msg,
+			m.id_msg, m.id_member, m.poster_time, m.subject, m.smileys_enabled, m.body, m.icon,
+			m.modified_time, m.modified_name, m.approved
+		FROM {db_prefix}messages AS m
+			INNER JOIN {db_prefix}topics AS t ON (t.id_topic = {int:current_topic})
+		WHERE m.id_msg = {raw:id_msg}
+			AND m.id_topic = {int:current_topic}' . (allowedTo('modify_any') || allowedTo('approve_posts') ? '' : (!$modSettings['postmod_active'] ? '
+			AND (m.id_member != {int:guest_id} AND m.id_member = {int:current_member})' : '
+			AND (m.approved = {int:is_approved} OR (m.id_member != {int:guest_id} AND m.id_member = {int:current_member}))')),
+		array(
+			'current_member' => $user_info['id'],
+			'current_topic' => $topic,
+			'id_msg' => empty($_REQUEST['msg']) ? 't.id_first_msg' : (int) $_REQUEST['msg'],
+			'is_approved' => 1,
+			'guest_id' => 0,
+		)
+	);
 	if ($smcFunc['db_num_rows']($request) == 0)
 		fatal_lang_error('no_board', false);
 	$row = $smcFunc['db_fetch_assoc']($request);

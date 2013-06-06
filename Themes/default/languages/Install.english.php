@@ -1,5 +1,5 @@
 <?php
-// Version: 2.0; Install
+// Version: 2.1; Install
 
 // These should be the same as those in index.language.php.
 $txt['lang_character_set'] = 'ISO-8859-1';
@@ -46,7 +46,7 @@ $txt['default_smileyset_name'] = 'Alienine\'s Set';
 $txt['default_aaron_smileyset_name'] = 'Aaron\'s Set';
 $txt['default_akyhne_smileyset_name'] = 'Akyhne\'s Set';
 $txt['default_fugue_smileyset_name'] = 'Fugue\'s Set';
-$txt['default_theme_name'] = 'SMF Default Theme - Curve';
+$txt['default_theme_name'] = 'SMF Default Theme - Curve II';
 $txt['default_core_theme_name'] = 'Core Theme';
 $txt['default_classic_theme_name'] = 'Classic YaBB SE Theme';
 $txt['default_babylon_theme_name'] = 'Babylon Theme';
@@ -94,6 +94,13 @@ $txt['install_settings_name_info'] = 'This is the name of your forum, ie. &quot;
 $txt['install_settings_name_default'] = 'My Community';
 $txt['install_settings_url'] = 'Forum URL';
 $txt['install_settings_url_info'] = 'This is the URL to your forum <strong>without the trailing \'/\'!</strong>.<br />In most cases, you can leave the default value in this box alone - it is usually right.';
+$txt['install_settings_reg_mode'] = 'Registration Mode';
+$txt['install_settings_reg_modes'] = 'Registration Modes';
+$txt['install_settings_reg_immediate'] = 'Immediate Registration';
+$txt['install_settings_reg_email'] = 'Email Activation';
+$txt['install_settings_reg_admin'] = 'Admin Approval';
+$txt['install_settings_reg_disabled'] = 'Registration Disabled';
+$txt['install_settings_reg_mode_info'] = 'This field allows you to change the mode of registration on installation to prevent unwanted registrations.';
 $txt['install_settings_compress'] = 'Gzip Output';
 $txt['install_settings_compress_title'] = 'Compress output to save bandwidth.';
 // In this string, you can translate the word "PASS" to change what it says when the test passes.

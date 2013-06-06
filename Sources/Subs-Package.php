@@ -10,19 +10,20 @@
  *
  * @package SMF
  * @author Simple Machines http://www.simplemachines.org
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
  */
 
 if (!defined('SMF'))
-	die('Hacking attempt...');
+	die('No direct access...');
 
 /**
  * Reads a .tar.gz file, filename, in and extracts file(s) from it.
  * essentially just a shortcut for read_tgz_data().
- * @param string $filename
+ *
+ * @param string $gzfilename
  * @param string $destination
  * @param bool $single_file = false
  * @param bool $overwrite = false
@@ -225,7 +226,16 @@ function read_tgz_data($data, $destination, $single_file = false, $overwrite = f
 		return $return;
 }
 
-// Extract zip data.  If destination is null, return a listing.
+/**
+ * Extract zip data.  If destination is null, return a listing.
+ *
+ * @param type $data
+ * @param type $destination
+ * @param type $single_file
+ * @param type $overwrite
+ * @param type $files_to_extract
+ * @return boolean
+ */
 function read_zip_data($data, $destination, $single_file = false, $overwrite = false, $files_to_extract = null)
 {
 	umask(0);
@@ -342,7 +352,7 @@ function read_zip_data($data, $destination, $single_file = false, $overwrite = f
  * Checks the existence of a remote file since file_exists() does not do remote.
  * will return false if the file is "moved permanently" or similar.
  * @param string url
- * @return bool true if the remote url exists.
+ * @return boolean true if the remote url exists.
  */
 function url_exists($url)
 {
@@ -369,7 +379,7 @@ function url_exists($url)
  * - gets this information from Packages/installed.list.
  * - returns the array of data.
  * - default sort order is package_installed time
- * 
+ *
  * @return array
  */
 function loadInstalledPackages()
@@ -432,7 +442,7 @@ function loadInstalledPackages()
  * - otherwise returns a basic array of id, version, filename, and similar information.
  * - an xmlArray is available in 'xml'.
  *
- * @param string $filename
+ * @param string $gzfilename
  * @return array
  */
 function getPackageInfo($gzfilename)
@@ -487,7 +497,14 @@ function getPackageInfo($gzfilename)
 	return $package;
 }
 
-// Create a chmod control for chmoding files.
+/**
+ * Create a chmod control for chmoding files.
+ *
+ * @param type $chmodFiles
+ * @param type $chmodOptions
+ * @param type $restore_write_status
+ * @return boolean
+ */
 function create_chmod_control($chmodFiles = array(), $chmodOptions = array(), $restore_write_status = false)
 {
 	global $context, $modSettings, $package_ftp, $boarddir, $txt, $sourcedir, $scripturl;
@@ -495,6 +512,15 @@ function create_chmod_control($chmodFiles = array(), $chmodOptions = array(), $r
 	// If we're restoring the status of existing files prepare the data.
 	if ($restore_write_status && isset($_SESSION['pack_ftp']) && !empty($_SESSION['pack_ftp']['original_perms']))
 	{
+		/**
+		 * Get a listing of files that will need to be set back to the original state
+		 *
+		 * @param type $dummy1
+		 * @param type $dummy2
+		 * @param type $dummy3
+		 * @param type $do_change
+		 * @return type
+		 */
 		function list_restoreFiles($dummy1, $dummy2, $dummy3, $do_change)
 		{
 			global $txt;
@@ -594,6 +620,7 @@ function create_chmod_control($chmodFiles = array(), $chmodOptions = array(), $r
 				'check' => array(
 					'header' => array(
 						'value' => '<input type="checkbox" onclick="invertAll(this, this.form);" class="input_check" />',
+						'class' => 'centercol',
 					),
 					'data' => array(
 						'sprintf' => array(
@@ -602,7 +629,7 @@ function create_chmod_control($chmodFiles = array(), $chmodOptions = array(), $r
 								'path' => false,
 							),
 						),
-						'style' => 'text-align: center',
+						'class' => 'centercol',
 					),
 				),
 				'result' => array(
@@ -627,7 +654,6 @@ function create_chmod_control($chmodFiles = array(), $chmodOptions = array(), $r
 					'position' => 'below_table_data',
 					'value' => '<input type="submit" name="restore_perms" value="' . $txt['package_restore_permissions_restore'] . '" class="button_submit" />',
 					'class' => 'titlebg',
-					'style' => 'text-align: right;',
 				),
 				array(
 					'position' => 'after_title',
@@ -793,6 +819,8 @@ function create_chmod_control($chmodFiles = array(), $chmodOptions = array(), $r
 }
 
 /**
+ * Use FTP functions to work with a package download/install
+ *
  * @param string $destination_url
  * @param array $files = none
  * @param bool $return = false
@@ -1138,6 +1166,7 @@ function parsePackageInfo(&$packageXML, $testing_only = true, $method = 'install
 				'type' => $actionType,
 				'function' => $action->exists('@function') ? $action->fetch('@function') : '',
 				'hook' => $action->exists('@hook') ? $action->fetch('@hook') : $action->fetch('.'),
+				'include_file' => $action->exists('@file') ? $action->fetch('@file') : '',
 				'reverse' => $action->exists('@reverse') && $action->fetch('@reverse') == 'true' ? true : false,
 				'description' => '',
 			);
@@ -1179,142 +1208,152 @@ function parsePackageInfo(&$packageXML, $testing_only = true, $method = 'install
 				'type' => 'error',
 			);
 		}
-
-		$this_action = &$return[];
-		$this_action = array(
-			'type' => $actionType,
-			'filename' => $action->fetch('@name'),
-			'description' => $action->fetch('.')
-		);
-
-		// If there is a destination, make sure it makes sense.
-		if (substr($actionType, 0, 6) != 'remove')
+		elseif (in_array($actionType, array('require-file', 'remove-file', 'require-dir', 'remove-dir', 'move-file', 'move-dir', 'create-file', 'create-dir')))
 		{
-			$this_action['unparsed_destination'] = $action->fetch('@destination');
-			$this_action['destination'] = parse_path($action->fetch('@destination')) . '/' . basename($this_action['filename']);
+			$this_action = &$return[];
+			$this_action = array(
+				'type' => $actionType,
+				'filename' => $action->fetch('@name'),
+				'description' => $action->fetch('.')
+			);
+
+			// If there is a destination, make sure it makes sense.
+			if (substr($actionType, 0, 6) != 'remove')
+			{
+				$this_action['unparsed_destination'] = $action->fetch('@destination');
+				$this_action['destination'] = parse_path($action->fetch('@destination')) . '/' . basename($this_action['filename']);
+			}
+			else
+			{
+				$this_action['unparsed_filename'] = $this_action['filename'];
+				$this_action['filename'] = parse_path($this_action['filename']);
+			}
+
+			// If we're moving or requiring (copying) a file.
+			if (substr($actionType, 0, 4) == 'move' || substr($actionType, 0, 7) == 'require')
+			{
+				if ($action->exists('@from'))
+					$this_action['source'] = parse_path($action->fetch('@from'));
+				else
+					$this_action['source'] = $temp_path . $this_action['filename'];
+			}
+
+			// Check if these things can be done. (chmod's etc.)
+			if ($actionType == 'create-dir')
+			{
+				if (!mktree($this_action['destination'], false))
+				{
+					$temp = $this_action['destination'];
+					while (!file_exists($temp) && strlen($temp) > 1)
+						$temp = dirname($temp);
+
+					$return[] = array(
+						'type' => 'chmod',
+						'filename' => $temp
+					);
+				}
+			}
+			elseif ($actionType == 'create-file')
+			{
+				if (!mktree(dirname($this_action['destination']), false))
+				{
+					$temp = dirname($this_action['destination']);
+					while (!file_exists($temp) && strlen($temp) > 1)
+						$temp = dirname($temp);
+
+					$return[] = array(
+						'type' => 'chmod',
+						'filename' => $temp
+					);
+				}
+
+				if (!is_writable($this_action['destination']) && (file_exists($this_action['destination']) || !is_writable(dirname($this_action['destination']))))
+					$return[] = array(
+						'type' => 'chmod',
+						'filename' => $this_action['destination']
+					);
+			}
+			elseif ($actionType == 'require-dir')
+			{
+				if (!mktree($this_action['destination'], false))
+				{
+					$temp = $this_action['destination'];
+					while (!file_exists($temp) && strlen($temp) > 1)
+						$temp = dirname($temp);
+
+					$return[] = array(
+						'type' => 'chmod',
+						'filename' => $temp
+					);
+				}
+			}
+			elseif ($actionType == 'require-file')
+			{
+				if ($action->exists('@theme'))
+					$this_action['theme_action'] = $action->fetch('@theme');
+
+				if (!mktree(dirname($this_action['destination']), false))
+				{
+					$temp = dirname($this_action['destination']);
+					while (!file_exists($temp) && strlen($temp) > 1)
+						$temp = dirname($temp);
+
+					$return[] = array(
+						'type' => 'chmod',
+						'filename' => $temp
+					);
+				}
+
+				if (!is_writable($this_action['destination']) && (file_exists($this_action['destination']) || !is_writable(dirname($this_action['destination']))))
+					$return[] = array(
+						'type' => 'chmod',
+						'filename' => $this_action['destination']
+					);
+			}
+			elseif ($actionType == 'move-dir' || $actionType == 'move-file')
+			{
+				if (!mktree(dirname($this_action['destination']), false))
+				{
+					$temp = dirname($this_action['destination']);
+					while (!file_exists($temp) && strlen($temp) > 1)
+						$temp = dirname($temp);
+
+					$return[] = array(
+						'type' => 'chmod',
+						'filename' => $temp
+					);
+				}
+
+				if (!is_writable($this_action['destination']) && (file_exists($this_action['destination']) || !is_writable(dirname($this_action['destination']))))
+					$return[] = array(
+						'type' => 'chmod',
+						'filename' => $this_action['destination']
+					);
+			}
+			elseif ($actionType == 'remove-dir')
+			{
+				if (!is_writable($this_action['filename']) && file_exists($this_action['filename']))
+					$return[] = array(
+						'type' => 'chmod',
+						'filename' => $this_action['filename']
+					);
+			}
+			elseif ($actionType == 'remove-file')
+			{
+				if (!is_writable($this_action['filename']) && file_exists($this_action['filename']))
+					$return[] = array(
+						'type' => 'chmod',
+						'filename' => $this_action['filename']
+					);
+			}
 		}
 		else
 		{
-			$this_action['unparsed_filename'] = $this_action['filename'];
-			$this_action['filename'] = parse_path($this_action['filename']);
-		}
-
-		// If we're moving or requiring (copying) a file.
-		if (substr($actionType, 0, 4) == 'move' || substr($actionType, 0, 7) == 'require')
-		{
-			if ($action->exists('@from'))
-				$this_action['source'] = parse_path($action->fetch('@from'));
-			else
-				$this_action['source'] = $temp_path . $this_action['filename'];
-		}
-
-		// Check if these things can be done. (chmod's etc.)
-		if ($actionType == 'create-dir')
-		{
-			if (!mktree($this_action['destination'], false))
-			{
-				$temp = $this_action['destination'];
-				while (!file_exists($temp) && strlen($temp) > 1)
-					$temp = dirname($temp);
-
-				$return[] = array(
-					'type' => 'chmod',
-					'filename' => $temp
-				);
-			}
-		}
-		elseif ($actionType == 'create-file')
-		{
-			if (!mktree(dirname($this_action['destination']), false))
-			{
-				$temp = dirname($this_action['destination']);
-				while (!file_exists($temp) && strlen($temp) > 1)
-					$temp = dirname($temp);
-
-				$return[] = array(
-					'type' => 'chmod',
-					'filename' => $temp
-				);
-			}
-
-			if (!is_writable($this_action['destination']) && (file_exists($this_action['destination']) || !is_writable(dirname($this_action['destination']))))
-				$return[] = array(
-					'type' => 'chmod',
-					'filename' => $this_action['destination']
-				);
-		}
-		elseif ($actionType == 'require-dir')
-		{
-			if (!mktree($this_action['destination'], false))
-			{
-				$temp = $this_action['destination'];
-				while (!file_exists($temp) && strlen($temp) > 1)
-					$temp = dirname($temp);
-
-				$return[] = array(
-					'type' => 'chmod',
-					'filename' => $temp
-				);
-			}
-		}
-		elseif ($actionType == 'require-file')
-		{
-			if ($action->exists('@theme'))
-				$this_action['theme_action'] = $action->fetch('@theme');
-
-			if (!mktree(dirname($this_action['destination']), false))
-			{
-				$temp = dirname($this_action['destination']);
-				while (!file_exists($temp) && strlen($temp) > 1)
-					$temp = dirname($temp);
-
-				$return[] = array(
-					'type' => 'chmod',
-					'filename' => $temp
-				);
-			}
-
-			if (!is_writable($this_action['destination']) && (file_exists($this_action['destination']) || !is_writable(dirname($this_action['destination']))))
-				$return[] = array(
-					'type' => 'chmod',
-					'filename' => $this_action['destination']
-				);
-		}
-		elseif ($actionType == 'move-dir' || $actionType == 'move-file')
-		{
-			if (!mktree(dirname($this_action['destination']), false))
-			{
-				$temp = dirname($this_action['destination']);
-				while (!file_exists($temp) && strlen($temp) > 1)
-					$temp = dirname($temp);
-
-				$return[] = array(
-					'type' => 'chmod',
-					'filename' => $temp
-				);
-			}
-
-			if (!is_writable($this_action['destination']) && (file_exists($this_action['destination']) || !is_writable(dirname($this_action['destination']))))
-				$return[] = array(
-					'type' => 'chmod',
-					'filename' => $this_action['destination']
-				);
-		}
-		elseif ($actionType == 'remove-dir')
-		{
-			if (!is_writable($this_action['filename']) && file_exists($this_action['filename']))
-				$return[] = array(
-					'type' => 'chmod',
-					'filename' => $this_action['filename']
-				);
-		}
-		elseif ($actionType == 'remove-file')
-		{
-			if (!is_writable($this_action['filename']) && file_exists($this_action['filename']))
-				$return[] = array(
-					'type' => 'chmod',
-					'filename' => $this_action['filename']
-				);
+			$return[] = array(
+				'type' => 'error',
+				'error_msg' => 'unknown_action',
+				'error_var' => $actionType
+			);
 		}
 	}
 
@@ -1431,6 +1470,8 @@ function parsePackageInfo(&$packageXML, $testing_only = true, $method = 'install
  * - returns true if the version matched.
  *
  * @param string $versions
+ * @param boolean $reset
+ * @param type $the_version
  * @return highest install value string or false
  */
 function matchHighestPackageVersion($versions, $reset = false, $the_version)
@@ -1470,7 +1511,7 @@ function matchHighestPackageVersion($versions, $reset = false, $the_version)
  *
  * @param string $version
  * @param string $versions
- * @return bool
+ * @return boolean
  */
 function matchPackageVersion($version, $versions)
 {
@@ -1571,6 +1612,7 @@ function compareVersions($version1, $version2)
 
 /**
  * Parses special identifiers out of the specified path.
+ *
  * @param string $path
  * @return string The parsed path
  */
@@ -1606,8 +1648,9 @@ function parse_path($path)
 /**
  * Deletes a directory, and all the files and direcories inside it.
  * requires access to delete these files.
- * @param string $path
- * @param bool $delete_directory = true
+ *
+ * @param string $dir
+ * @param bool $delete_dir = true
  */
 function deltree($dir, $delete_dir = true)
 {
@@ -1681,9 +1724,10 @@ function deltree($dir, $delete_dir = true)
 /**
  * Creates the specified tree structure with the mode specified.
  * creates every directory in path until it finds one that already exists.
- * @param string $path
+ *
+ * @param string $strPath
  * @param int $mode
- * @return bool true if successful, false otherwise
+ * @return boolean true if successful, false otherwise
  */
 function mktree($strPath, $mode)
 {
@@ -1750,6 +1794,7 @@ function mktree($strPath, $mode)
 /**
  * Copies one directory structure over to another.
  * requires the destination to be writable.
+ *
  * @param string $source
  * @param string $destination
  */
@@ -1796,6 +1841,8 @@ function copytree($source, $destination)
 }
 
 /**
+ * Create a tree listing for a given directory path
+ *
  * @param string $path
  * @param string $sub_path = ''
  * @return array
@@ -1828,6 +1875,7 @@ function listtree($path, $sub_path = '')
 
 /**
  * Parses a xml-style modification file (file).
+ *
  * @param string $file
  * @param bool $testing = true tells it the modifications shouldn't actually be saved.
  * @param bool $undo = false specifies that the modifications the file requests should be undone; this doesn't work with everything (regular expressions.)
@@ -2519,6 +2567,12 @@ function parseBoardMod($file, $testing = true, $undo = false, $theme_paths = arr
 	return $actions;
 }
 
+/**
+ * Get the physical contents of a packages file
+ *
+ * @param type $filename
+ * @return boolean
+ */
 function package_get_contents($filename)
 {
 	global $package_cache, $modSettings;
@@ -2546,8 +2600,10 @@ function package_get_contents($filename)
  * uses FTP to create/chmod the file when necessary and available.
  * uses text mode for text mode file extensions.
  * returns the number of bytes written.
+ *
  * @param string $filename
  * @param string $data
+ * @param bool testing
  * @return int
  */
 function package_put_contents($filename, $data, $testing = false)
@@ -2603,6 +2659,12 @@ function package_put_contents($filename, $data, $testing = false)
 	return strlen($data);
 }
 
+/**
+ * Clears (removes the files) the current package cache (temp directory)
+ *
+ * @param type $trash
+ * @return type
+ */
 function package_flush_cache($trash = false)
 {
 	global $package_ftp, $package_cache;
@@ -2661,7 +2723,7 @@ function package_flush_cache($trash = false)
  * @param string $filename
  * @param string $perm_state = 'writable'
  * @param bool $track_change = false
- * @return bool True if it worked, false if it didn't
+ * @return boolean True if it worked, false if it didn't
  */
 function package_chmod($filename, $perm_state = 'writable', $track_change = false)
 {
@@ -3120,10 +3182,15 @@ function fetch_web_data($url, $post_data = '', $keep_alive = false, $redirection
 	return $data;
 }
 
-// crc32 doesn't work as expected on 64-bit functions - make our own.
-// http://www.php.net/crc32#79567
 if (!function_exists('smf_crc32'))
 {
+	/**
+	 * crc32 doesn't work as expected on 64-bit functions - make our own.
+	 * http://www.php.net/crc32#79567
+	 *
+	 * @param type $number
+	 * @return type
+	 */
 	function smf_crc32($number)
 	{
 		$crc = crc32($number);

@@ -4,7 +4,7 @@
  *
  * @package SMF
  * @author Simple Machines
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
@@ -16,16 +16,7 @@ function template_moderation_center()
 
 	// Show a welcome message to the user.
 	echo '
-	<div id="modcenter">
-		<div class="cat_bar">
-			<h3 class="catbg">', $txt['moderation_center'], '</h3>
-		</div>
-		<div class="information">
-			<strong>', $txt['hello_guest'], ' ', $context['user']['name'], '!</strong>
-			<p>
-				', $txt['mc_description'], '
-			</p>
-		</div>';
+	<div id="modcenter">';
 
 	$alternate = true;
 	// Show all the blocks they want to see.
@@ -55,15 +46,13 @@ function template_latest_news()
 	echo '
 		<div class="cat_bar">
 			<h3 class="catbg">
-				<span class="ie6_header floatleft"><a href="', $scripturl, '?action=helpadmin;help=live_news" onclick="return reqWin(this.href);" class="help"><img src="', $settings['images_url'], '/helptopics.png" alt="', $txt['help'], '" class="icon" /></a> ', $txt['mc_latest_news'], '</span>
+				<a href="', $scripturl, '?action=helpadmin;help=live_news" onclick="return reqOverlayDiv(this.href);" class="help"><img src="', $settings['images_url'], '/helptopics_hd.png" alt="', $txt['help'], '" class="icon" /></a> ', $txt['mc_latest_news'], '
 			</h3>
 		</div>
 		<div class="windowbg">
-			<span class="topslice"><span></span></span>
 			<div class="content">
 				<div id="smfAnnouncements" class="smalltext">', $txt['mc_cannot_connect_sm'], '</div>
 			</div>
-			<span class="botslice"><span></span></span>
 		</div>';
 
 	// This requires a lot of javascript...
@@ -71,7 +60,6 @@ function template_latest_news()
 	echo '
 		<script type="text/javascript" src="', $scripturl, '?action=viewsmfile;filename=current-version.js"></script>
 		<script type="text/javascript" src="', $scripturl, '?action=viewsmfile;filename=latest-news.js"></script>
-		<script type="text/javascript" src="', $settings['default_theme_url'], '/scripts/admin.js?alp21"></script>
 		<script type="text/javascript"><!-- // --><![CDATA[
 			var oAdminIndex = new smf_AdminIndex({
 				sSelf: \'oAdminCenter\',
@@ -106,7 +94,6 @@ function template_group_requests_block()
 			</h3>
 		</div>
 		<div class="windowbg">
-			<span class="topslice"><span></span></span>
 			<div class="content modbox">
 				<ul class="reset">';
 
@@ -126,7 +113,6 @@ function template_group_requests_block()
 		echo '
 				</ul>
 			</div>
-			<span class="botslice"><span></span></span>
 		</div>';
 }
 
@@ -142,7 +128,6 @@ function template_reported_posts_block()
 			</h3>
 		</div>
 		<div class="windowbg">
-			<span class="topslice"><span></span></span>
 			<div class="content modbox">
 				<ul class="reset">';
 
@@ -162,7 +147,6 @@ function template_reported_posts_block()
 		echo '
 				</ul>
 			</div>
-			<span class="botslice"><span></span></span>
 		</div>';
 }
 
@@ -177,7 +161,6 @@ function template_watched_users()
 			</h3>
 		</div>
 		<div class="windowbg">
-			<span class="topslice"><span></span></span>
 			<div class="content modbox">
 				<ul class="reset">';
 
@@ -197,7 +180,6 @@ function template_watched_users()
 		echo '
 				</ul>
 			</div>
-			<span class="botslice"><span></span></span>
 		</div>';
 }
 
@@ -212,7 +194,6 @@ function template_notes()
 				<h3 class="catbg">', $txt['mc_notes'], '</h3>
 			</div>
 			<div class="windowbg">
-				<span class="topslice"><span></span></span>
 				<div class="content modbox">';
 
 		if (!empty($context['notes']))
@@ -228,7 +209,7 @@ function template_notes()
 			echo '
 					</ul>
 					<div class="pagesection notes">
-						<span class="smalltext">', $txt['pages'], ': ', $context['page_index'], '</span>
+						<span class="smalltext">', $context['page_index'], '</span>
 					</div>';
 		}
 
@@ -236,12 +217,8 @@ function template_notes()
 					<div class="floatleft post_note">
 						<input type="text" name="new_note" value="', $txt['mc_click_add_note'], '" style="width: 95%;" onclick="if (this.value == \'', $txt['mc_click_add_note'], '\') this.value = \'\';" class="input_text" />
 					</div>
-					<div class="floatright">
-						<input type="submit" name="makenote" value="', $txt['mc_add_note'], '" class="button_submit" />
-					</div>
-					<br class="clear" />
+					<input type="submit" name="makenote" value="', $txt['mc_add_note'], '" class="button_submit" />
 				</div>
-				<span class="botslice"><span></span></span>
 			</div>
 			<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
 		</form>';
@@ -252,14 +229,14 @@ function template_reported_posts()
 	global $settings, $options, $context, $txt, $scripturl;
 
 	echo '
-	<form action="', $scripturl, '?action=moderate;area=reports', $context['view_closed'] ? ';sa=closed' : '', ';start=', $context['start'], '" method="post" accept-charset="', $context['character_set'], '">
+	<form id="reported_posts" action="', $scripturl, '?action=moderate;area=reports', $context['view_closed'] ? ';sa=closed' : '', ';start=', $context['start'], '" method="post" accept-charset="', $context['character_set'], '">
 		<div class="cat_bar">
 			<h3 class="catbg">
 				', $context['view_closed'] ? $txt['mc_reportedp_closed'] : $txt['mc_reportedp_active'], '
 			</h3>
 		</div>
-		<div class="pagesection floatleft">
-			', $txt['pages'], ': ', $context['page_index'], '
+		<div class="pagesection">
+			<div class="pagelinks">', $context['page_index'], '</div>
 		</div>';
 
 	// Make the buttons.
@@ -271,22 +248,13 @@ function template_reported_posts()
 	foreach ($context['reports'] as $report)
 	{
 		echo '
-		<div class="', $report['alternate'] ? 'windowbg' : 'windowbg2', '">
-			<span class="topslice"><span></span></span>
+		<div class="generic_list_wrapper ', $report['alternate'] ? 'windowbg' : 'windowbg2', '">
 			<div class="content">
-				<div>
-					<div class="floatleft">
-						<strong><a href="', $report['topic_href'], '">', $report['subject'], '</a></strong> ', $txt['mc_reportedp_by'], ' <strong>', $report['author']['link'], '</strong>
-					</div>
-					<div class="floatright">
-						<a href="', $report['report_href'], '">', $details_button, '</a>
-						<a href="', $scripturl, '?action=moderate;area=reports', $context['view_closed'] ? ';sa=closed' : '', ';ignore=', (int) !$report['ignore'], ';rid=', $report['id'], ';start=', $context['start'], ';', $context['session_var'], '=', $context['session_id'], '" ', !$report['ignore'] ? 'onclick="return confirm(\'' . $txt['mc_reportedp_ignore_confirm'] . '\');"' : '', '>', $report['ignore'] ? $unignore_button : $ignore_button, '</a>
-						<a href="', $scripturl, '?action=moderate;area=reports', $context['view_closed'] ? ';sa=closed' : '', ';close=', (int) !$report['closed'], ';rid=', $report['id'], ';start=', $context['start'], ';', $context['session_var'], '=', $context['session_id'], '">', $close_button, '</a>
-						', !$context['view_closed'] ? '<input type="checkbox" name="close[]" value="' . $report['id'] . '" class="input_check" />' : '', '
-					</div>
-				</div><br />
+				<h5>
+					<strong><a href="', $report['topic_href'], '">', $report['subject'], '</a></strong> ', $txt['mc_reportedp_by'], ' <strong>', $report['author']['link'], '</strong>
+				</h5>
 				<div class="smalltext">
-					&#171; ', $txt['mc_reportedp_last_reported'], ': ', $report['last_updated'], ' &#187;<br />';
+					', $txt['mc_reportedp_last_reported'], ': ', $report['last_updated'], '&nbsp;-&nbsp;';
 
 		// Prepare the comments...
 		$comments = array();
@@ -294,12 +262,18 @@ function template_reported_posts()
 			$comments[$comment['member']['id']] = $comment['member']['link'];
 
 		echo '
-					&#171; ', $txt['mc_reportedp_reported_by'], ': ', implode(', ', $comments), ' &#187;
+					', $txt['mc_reportedp_reported_by'], ': ', implode(', ', $comments), '
 				</div>
 				<hr />
 				', $report['body'], '
+				<br />
+				<ul class="quickbuttons">
+					<li><a href="', $report['report_href'], '">', $details_button, '</a></li>
+					<li><a href="', $scripturl, '?action=moderate;area=reports', $context['view_closed'] ? ';sa=closed' : '', ';ignore=', (int) !$report['ignore'], ';rid=', $report['id'], ';start=', $context['start'], ';', $context['session_var'], '=', $context['session_id'], '" ', !$report['ignore'] ? 'onclick="return confirm(\'' . $txt['mc_reportedp_ignore_confirm'] . '\');"' : '', '>', $report['ignore'] ? $unignore_button : $ignore_button, '</a></li>
+					<li><a href="', $scripturl, '?action=moderate;area=reports', $context['view_closed'] ? ';sa=closed' : '', ';close=', (int) !$report['closed'], ';rid=', $report['id'], ';start=', $context['start'], ';', $context['session_var'], '=', $context['session_id'], '">', $close_button, '</a></li>
+					<li>', !$context['view_closed'] ? '<input type="checkbox" name="close[]" value="' . $report['id'] . '" class="input_check" />' : '', '</li>
+				</ul>
 			</div>
-			<span class="botslice"><span></span></span>
 		</div>';
 	}
 
@@ -307,25 +281,20 @@ function template_reported_posts()
 	if (empty($context['reports']))
 		echo '
 		<div class="windowbg2">
-			<span class="topslice"><span></span></span>
 			<div class="content">
 				<p class="centertext">', $txt['mc_reportedp_none_found'], '</p>
 			</div>
-			<span class="botslice"><span></span></span>
 		</div>';
 
 	echo '
 		<div class="pagesection">
-			<div class="floatleft">
-				', $txt['pages'], ': ', $context['page_index'], '
-			</div>
+			<div class="pagelinks floatleft">', $context['page_index'], '</div>
 			<div class="floatright">
 				', !$context['view_closed'] ? '<input type="submit" name="close_selected" value="' . $txt['mc_reportedp_close_selected'] . '" class="button_submit" />' : '', '
 			</div>
 		</div>
 		<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
-	</form>
-	<br class="clear" />';
+	</form>';
 }
 
 // Show a list of all the unapproved posts
@@ -349,28 +318,25 @@ function template_unapproved_posts()
 	if (empty($context['unapproved_items']))
 		echo '
 		<div class="windowbg2">
-			<span class="topslice"><span></span></span>
 			<div class="content">
 				<p class="centertext">', $txt['mc_unapproved_' . $context['current_view'] . '_none_found'], '</p>
 			</div>
-			<span class="botslice"><span></span></span>
 		</div>';
 	else
 		echo '
 			<div class="pagesection floatleft">
-				', $txt['pages'], ': ', $context['page_index'], '
+				', $context['page_index'], '
 			</div>';
 
 	foreach ($context['unapproved_items'] as $item)
 	{
 		echo '
-		<div class="topic">
+		<div class="topic clear">
 			<div class="', $item['alternate'] == 0 ? 'windowbg2' : 'windowbg', ' core_posts">
-				<span class="topslice"><span></span></span>
 				<div class="content">
 					<div class="counter">', $item['counter'], '</div>
 					<div class="topic_details">
-						<h5><strong><a href="', $scripturl, '#c', $item['category']['id'], '">', $item['category']['name'], '</a> / <a href="', $scripturl, '?board=', $item['board']['id'], '.0">', $item['board']['name'], '</a> / <a href="', $scripturl, '?topic=', $item['topic'], '.', $item['start'], '#msg', $item['id'], '">', $item['subject'], '</a></strong></h5>
+						<h5><strong>', $item['category']['link'], ' / ', $item['board']['link'], ' / ', $item['link'], '</strong></h5>
 						<span class="smalltext"><strong>', $txt['mc_unapproved_by'], ' ', $item['poster']['link'], ' ', $txt['on'], ':</strong> ', $item['time'], '</span>
 					</div>
 					<div class="list_posts">
@@ -390,9 +356,7 @@ function template_unapproved_posts()
 
 			echo '
 					</span>
-					<br class="clear" />
 				</div>
-				<span class="botslice"><span></span></span>
 			</div>
 		</div>';
 	}
@@ -415,37 +379,14 @@ function template_unapproved_posts()
 	if (!empty($context['unapproved_items']))
 		echo '
 			<div class="floatleft">
-				<div class="pagelinks">', $txt['pages'], ': ', $context['page_index'], '</div>
+				<div class="pagelinks">', $context['page_index'], '</div>
 			</div>';
 
 	echo '
 		</div>
 		<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
 	</form>
-	</div>
-	<br class="clear" />';
-}
-
-// List all attachments awaiting approval.
-function template_unapproved_attachments()
-{
-	global $settings, $options, $context, $txt, $scripturl;
-
-	// Show all the attachments still oustanding.
-	echo '
-	<div id="modcenter">
-		<div class="cat_bar">
-			<h3 class="catbg">', $txt['mc_unapproved_attachments'], '</h3>
-		</div>
-		<div class="information">
-			', $txt['mc_unapproved_attachments_desc'], '
-		</div>';
-
-	template_show_list('mc_unapproved_attach');
-
-	echo '
-	</div>
-	<br class="clear" />';
+	</div>';
 }
 
 function template_viewmodreport()
@@ -479,11 +420,9 @@ function template_viewmodreport()
 				</h3>
 			</div>
 			<div class="windowbg2">
-				<span class="topslice"><span></span></span>
 				<div class="content">
 					', $context['report']['body'], '
 				</div>
-				<span class="botslice"><span></span></span>
 			</div>
 			<br />
 			<div class="cat_bar">
@@ -493,12 +432,10 @@ function template_viewmodreport()
 	foreach ($context['report']['comments'] as $comment)
 		echo '
 			<div class="windowbg">
-				<span class="topslice"><span></span></span>
 				<div class="content">
 					<p class="smalltext">', sprintf($txt['mc_modreport_whoreported_data'], $comment['member']['link'] . (empty($comment['member']['id']) && !empty($comment['member']['ip']) ? ' (' . $comment['member']['ip'] . ')' : ''), $comment['time']), '</p>
 					<p>', $comment['message'], '</p>
 				</div>
-				<span class="botslice"><span></span></span>
 			</div>';
 
 	echo '
@@ -507,12 +444,13 @@ function template_viewmodreport()
 				<h3 class="catbg">', $txt['mc_modreport_mod_comments'], '</h3>
 			</div>
 			<div class="windowbg2">
-				<span class="topslice"><span></span></span>
 				<div class="content">';
 
 	if (empty($context['report']['mod_comments']))
 		echo '
-					<p class="centertext">', $txt['mc_modreport_no_mod_comment'], '</p>';
+				<div class="information">
+					<p class="centertext">', $txt['mc_modreport_no_mod_comment'], '</p>
+				</div>';
 
 	foreach ($context['report']['mod_comments'] as $comment)
 		echo
@@ -524,7 +462,6 @@ function template_viewmodreport()
 						<input type="submit" name="add_comment" value="', $txt['mc_modreport_add_mod_comment'], '" class="button_submit" />
 					</div>
 				</div>
-				<span class="botslice"><span></span></span>
 			</div>
 			<br />';
 
@@ -535,8 +472,7 @@ function template_viewmodreport()
 	echo '
 			<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
 		</form>
-	</div>
-	<br class="clear" />';
+	</div>';
 }
 
 // Callback function for showing a watched users post in the table.
@@ -580,14 +516,7 @@ function template_moderation_settings()
 	echo '
 	<div id="modcenter">
 		<form action="', $scripturl, '?action=moderate;area=settings" method="post" accept-charset="', $context['character_set'], '">
-			<div class="cat_bar">
-				<h3 class="catbg">', $txt['mc_prefs_title'], '</h3>
-			</div>
-			<div class="information">
-				', $txt['mc_prefs_desc'], '
-			</div>
 			<div class="windowbg2">
-				<span class="topslice"><span></span></span>
 				<div class="content">
 					<dl class="settings">
 						<dt>
@@ -643,13 +572,10 @@ function template_moderation_settings()
 					<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
 					<input type="hidden" name="', $context['mod-set_token_var'], '" value="', $context['mod-set_token'], '" />
 					<input type="submit" name="save" value="', $txt['save'], '" class="button_submit" />
-					<br class="clear_right" />
 				</div>
-				<span class="botslice"><span></span></span>
 			</div>
 		</form>
-	</div>
-	<br class="clear" />';
+	</div>';
 }
 
 // Show a notice sent to a user.
@@ -673,7 +599,6 @@ function template_show_notice()
 			<h3 class="titlebg">', $txt['show_notice_subject'], ': ', $context['notice_subject'], '</h3>
 		</div>
 		<div class="windowbg">
-			<span class="topslice"><span></span></span>
 			<div class="content">
 				<dl>
 					<dt>
@@ -684,7 +609,6 @@ function template_show_notice()
 					</dd>
 				</dl>
 			</div>
-			<span class="botslice"><span></span></span>
 		</div>
 	</body>
 </html>';
@@ -706,7 +630,6 @@ function template_warn_template()
 				', $txt['mc_warning_template_desc'], '
 			</div>
 			<div class="windowbg">
-				<span class="topslice"><span></span></span>
 				<div class="content">
 					<div class="errorbox"', empty($context['warning_errors']) ? ' style="display: none"' : '', ' id="errors">
 						<dl>
@@ -758,15 +681,13 @@ function template_warn_template()
 					<hr class="hrcolor" />
 					<input type="submit" name="preview" id="preview_button" value="', $txt['preview'], '" class="button_submit" />
 					<input type="submit" name="save" value="', $context['page_title'], '" class="button_submit" />
-					<br class="clear_right" />
 				</div>
-				<span class="botslice"><span></span></span>
 			</div>
 			<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
 			<input type="hidden" name="', $context['mod-wt_token_var'], '" value="', $context['mod-wt_token'], '" />
 		</form>
 	</div>
-	<br class="clear" />
+
 	<script type="text/javascript"><!-- // --><![CDATA[
 		$(document).ready(function() {
 			$("#preview_button").click(function() {

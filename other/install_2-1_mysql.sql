@@ -149,6 +149,8 @@ VALUES (-1, 1, 'poll_view'),
 	(0, 1, 'poll_vote'),
 	(0, 1, 'post_attachment'),
 	(0, 1, 'post_new'),
+	(0, 1, 'post_draft'),
+	(0, 1, 'post_autosave_draft'),
 	(0, 1, 'post_reply_any'),
 	(0, 1, 'post_reply_own'),
 	(0, 1, 'post_unapproved_topics'),
@@ -161,6 +163,8 @@ VALUES (-1, 1, 'poll_view'),
 	(0, 1, 'view_attachments'),
 	(2, 1, 'moderate_board'),
 	(2, 1, 'post_new'),
+	(2, 1, 'post_draft'),
+	(2, 1, 'post_autosave_draft'),
 	(2, 1, 'post_reply_own'),
 	(2, 1, 'post_reply_any'),
 	(2, 1, 'post_unapproved_topics'),
@@ -194,6 +198,8 @@ VALUES (-1, 1, 'poll_view'),
 	(2, 1, 'view_attachments'),
 	(3, 1, 'moderate_board'),
 	(3, 1, 'post_new'),
+	(3, 1, 'post_draft'),
+	(3, 1, 'post_autosave_draft'),
 	(3, 1, 'post_reply_own'),
 	(3, 1, 'post_reply_any'),
 	(3, 1, 'post_unapproved_topics'),
@@ -235,6 +241,8 @@ VALUES (-1, 1, 'poll_view'),
 	(0, 2, 'poll_vote'),
 	(0, 2, 'post_attachment'),
 	(0, 2, 'post_new'),
+	(0, 2, 'post_draft'),
+	(0, 2, 'post_autosave_draft'),
 	(0, 2, 'post_reply_any'),
 	(0, 2, 'post_reply_own'),
 	(0, 2, 'post_unapproved_topics'),
@@ -247,6 +255,8 @@ VALUES (-1, 1, 'poll_view'),
 	(0, 2, 'view_attachments'),
 	(2, 2, 'moderate_board'),
 	(2, 2, 'post_new'),
+	(2, 2, 'post_draft'),
+	(2, 2, 'post_autosave_draft'),
 	(2, 2, 'post_reply_own'),
 	(2, 2, 'post_reply_any'),
 	(2, 2, 'post_unapproved_topics'),
@@ -280,6 +290,8 @@ VALUES (-1, 1, 'poll_view'),
 	(2, 2, 'view_attachments'),
 	(3, 2, 'moderate_board'),
 	(3, 2, 'post_new'),
+	(3, 2, 'post_draft'),
+	(3, 2, 'post_autosave_draft'),
 	(3, 2, 'post_reply_own'),
 	(3, 2, 'post_reply_any'),
 	(3, 2, 'post_unapproved_topics'),
@@ -331,6 +343,8 @@ VALUES (-1, 1, 'poll_view'),
 	(0, 3, 'view_attachments'),
 	(2, 3, 'moderate_board'),
 	(2, 3, 'post_new'),
+	(2, 3, 'post_draft'),
+	(2, 3, 'post_autosave_draft'),
 	(2, 3, 'post_reply_own'),
 	(2, 3, 'post_reply_any'),
 	(2, 3, 'post_unapproved_topics'),
@@ -364,6 +378,8 @@ VALUES (-1, 1, 'poll_view'),
 	(2, 3, 'view_attachments'),
 	(3, 3, 'moderate_board'),
 	(3, 3, 'post_new'),
+	(3, 3, 'post_draft'),
+	(3, 3, 'post_autosave_draft'),
 	(3, 3, 'post_reply_own'),
 	(3, 3, 'post_reply_any'),
 	(3, 3, 'post_unapproved_topics'),
@@ -405,6 +421,8 @@ VALUES (-1, 1, 'poll_view'),
 	(0, 4, 'view_attachments'),
 	(2, 4, 'moderate_board'),
 	(2, 4, 'post_new'),
+	(2, 4, 'post_draft'),
+	(2, 4, 'post_autosave_draft'),
 	(2, 4, 'post_reply_own'),
 	(2, 4, 'post_reply_any'),
 	(2, 4, 'post_unapproved_topics'),
@@ -438,6 +456,8 @@ VALUES (-1, 1, 'poll_view'),
 	(2, 4, 'view_attachments'),
 	(3, 4, 'moderate_board'),
 	(3, 4, 'post_new'),
+	(3, 4, 'post_draft'),
+	(3, 4, 'post_autosave_draft'),
 	(3, 4, 'post_reply_own'),
 	(3, 4, 'post_reply_any'),
 	(3, 4, 'post_unapproved_topics'),
@@ -1139,6 +1159,7 @@ CREATE TABLE {$db_prefix}log_topics (
   id_member mediumint(8) unsigned NOT NULL default '0',
   id_topic mediumint(8) unsigned NOT NULL default '0',
   id_msg int(10) unsigned NOT NULL default '0',
+  disregarded tinyint(3) NOT NULL default '0',
   PRIMARY KEY (id_member, id_topic),
   KEY id_topic (id_topic)
 ) ENGINE=MyISAM;
@@ -1230,7 +1251,7 @@ CREATE TABLE {$db_prefix}members (
   icq varchar(255) NOT NULL default '',
   aim varchar(255) NOT NULL default '',
   yim varchar(32) NOT NULL default '',
-  msn varchar(255) NOT NULL default '',
+  skype varchar(255) NOT NULL default '',
   hide_email tinyint(4) NOT NULL default '0',
   show_online tinyint(4) NOT NULL default '1',
   time_format varchar(80) NOT NULL default '',
@@ -1383,6 +1404,16 @@ CREATE TABLE {$db_prefix}moderators (
 ) ENGINE=MyISAM;
 
 #
+# Table structure for table `moderator_groups`
+#
+
+CREATE TABLE {$db_prefix}moderator_groups (
+  id_board smallint(5) unsigned NOT NULL default '0',
+  id_group smallint(5) unsigned NOT NULL default '0',
+  PRIMARY KEY (id_board, id_group) 
+) ENGINE=MyISAM;
+
+#
 # Table structure for table `openid_assoc`
 #
 
@@ -1463,6 +1494,8 @@ VALUES (-1, 'search_posts'),
 	(0, 'profile_view_any'),
 	(0, 'pm_read'),
 	(0, 'pm_send'),
+	(0, 'pm_draft'),
+	(0, 'pm_autosave_draft'),
 	(0, 'calendar_view'),
 	(0, 'view_stats'),
 	(0, 'who_view'),
@@ -1480,6 +1513,8 @@ VALUES (-1, 'search_posts'),
 	(2, 'profile_view_any'),
 	(2, 'pm_read'),
 	(2, 'pm_send'),
+	(2, 'pm_draft'),
+	(2, 'pm_autosave_draft'),
 	(2, 'calendar_view'),
 	(2, 'view_stats'),
 	(2, 'who_view'),
@@ -1616,8 +1651,9 @@ VALUES
 	(9, 0, 0, 1, 'w', 0, 'weekly_maintenance'),
 	(10, 0, 120, 1, 'd', 1, 'paid_subscriptions'),
 	(11, 0, 120, 1, 'd', 1, 'remove_temp_attachments'),
-	(12, 0, 180, 1, 'd', 1, 'remove_topic_redirect');
-	
+	(12, 0, 180, 1, 'd', 1, 'remove_topic_redirect'),
+	(13, 0, 240, 1, 'd', 1, 'remove_old_drafts');
+
 # --------------------------------------------------------
 
 #
@@ -1689,8 +1725,17 @@ VALUES ('smfVersion', '{$smf_version}'),
 	('cal_showholidays', '1'),
 	('cal_showbdays', '1'),
 	('cal_showevents', '1'),
-	('cal_showweeknum', '0'),
 	('cal_maxspan', '7'),
+	('cal_highlight_events', '3'),
+	('cal_highlight_holidays', '3'),
+	('cal_highlight_birthdays', '3'),
+	('cal_disable_prev_next', '0'),
+	('cal_display_type', '0'),
+	('cal_week_links', '2'),
+	('cal_prev_next_links', '1'),
+	('cal_short_days', '0'),
+	('cal_short_months', '0'),
+	('cal_week_numbers', '0'),
 	('smtp_host', ''),
 	('smtp_port', '25'),
 	('smtp_username', ''),
@@ -1712,7 +1757,7 @@ VALUES ('smfVersion', '{$smf_version}'),
 	('xmlnews_maxlen', '255'),
 	('hotTopicPosts', '15'),
 	('hotTopicVeryPosts', '25'),
-	('registration_method', '0'),
+	('registration_method', '{$registration_method}'),
 	('send_validation_onChange', '0'),
 	('send_welcomeEmail', '1'),
 	('allow_editDisplayName', '1'),
@@ -1809,7 +1854,8 @@ VALUES ('smfVersion', '{$smf_version}'),
 	('attachment_image_paranoid', '0'),
 	('attachment_thumb_png', '1'),
 	('avatar_reencode', '1'),
-	('avatar_paranoid', '0');
+	('avatar_paranoid', '0'),
+	('enable_disregard', '0');
 # --------------------------------------------------------
 
 #
@@ -1971,7 +2017,7 @@ VALUES (1, 'name', '{$default_theme_name}'),
 	(1, 'enable_news', '1'),
 	(1, 'forum_width', '90%');
 
-INSERT INTO {$db_prefix}themes (id_member, id_theme, variable, value) VALUES (-1, 1, 'display_quick_reply', '1');
+INSERT INTO {$db_prefix}themes (id_member, id_theme, variable, value) VALUES (-1, 1, 'display_quick_reply', '2');
 INSERT INTO {$db_prefix}themes (id_member, id_theme, variable, value) VALUES (-1, 1, 'posts_apply_ignore_list', '1');
 # --------------------------------------------------------
 
@@ -2017,3 +2063,27 @@ INSERT INTO {$db_prefix}topics
 	(id_topic, id_board, id_first_msg, id_last_msg, id_member_started, id_member_updated)
 VALUES (1, 1, 1, 1, 0, 0);
 # --------------------------------------------------------
+
+#
+# Table structure for table `user_drafts`
+#
+
+CREATE TABLE {$db_prefix}user_drafts (
+  id_draft int(10) unsigned NOT NULL auto_increment,
+  id_topic mediumint(8) unsigned NOT NULL default '0',
+  id_board smallint(5) unsigned NOT NULL default '0',
+  id_reply int(10) unsigned NOT NULL default '0',
+  type tinyint(4) NOT NULL default '0',
+  poster_time int(10) unsigned NOT NULL default '0',
+  id_member mediumint(8) unsigned NOT NULL default '0',
+  subject varchar(255) NOT NULL default '',
+  smileys_enabled tinyint(4) NOT NULL default '1',
+  body mediumtext NOT NULL,
+  icon varchar(16) NOT NULL default 'xx',
+  locked tinyint(4) NOT NULL default '0',
+  is_sticky tinyint(4) NOT NULL default '0',
+  to_list varchar(255) NOT NULL default '',
+  outbox tinyint(4) NOT NULL default '0',
+  PRIMARY KEY (id_draft),
+  UNIQUE id_member (id_member, id_draft, type)
+) ENGINE=MyISAM;

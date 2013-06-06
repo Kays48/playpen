@@ -8,14 +8,14 @@
  *
  * @package SMF
  * @author Simple Machines http://www.simplemachines.org
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
  */
 
 if (!defined('SMF'))
-	die('Hacking attempt...');
+	die('No direct access...');
 
 /**
  * Fetches a list of boards and (optional) categories including
@@ -53,8 +53,10 @@ function getBoardIndex($boardIndexOptions)
 			' . ($user_info['is_guest'] ? ' 1 AS is_read, 0 AS new_from,' : '
 			(IFNULL(lb.id_msg, 0) >= b.id_msg_updated) AS is_read, IFNULL(lb.id_msg, -1) + 1 AS new_from,' . ($boardIndexOptions['include_categories'] ? '
 			c.can_collapse, IFNULL(cc.id_member, 0) AS is_collapsed,' : '')) . '
-			IFNULL(mem.id_member, 0) AS id_member, m.id_msg,
-			IFNULL(mods_mem.id_member, 0) AS id_moderator, mods_mem.real_name AS mod_real_name
+			IFNULL(mem.id_member, 0) AS id_member, mem.avatar, m.id_msg,
+			IFNULL(mods_grp.id_group, 0) AS id_moderator_group, mods_grp.group_name AS mod_group_name,
+			IFNULL(mods_mem.id_member, 0) AS id_moderator, mods_mem.real_name AS mod_real_name' . (!empty($settings['avatars_on_indexes']) ? ',
+			IFNULL(a.id_attach, 0) AS id_attach, a.filename, a.attachment_type' : '') . '
 		FROM {db_prefix}boards AS b' . ($boardIndexOptions['include_categories'] ? '
 			LEFT JOIN {db_prefix}categories AS c ON (c.id_cat = b.id_cat)' : '') . '
 			LEFT JOIN {db_prefix}messages AS m ON (m.id_msg = b.id_last_msg)
@@ -62,7 +64,10 @@ function getBoardIndex($boardIndexOptions)
 			LEFT JOIN {db_prefix}log_boards AS lb ON (lb.id_board = b.id_board AND lb.id_member = {int:current_member})' . ($boardIndexOptions['include_categories'] ? '
 			LEFT JOIN {db_prefix}collapsed_categories AS cc ON (cc.id_cat = c.id_cat AND cc.id_member = {int:current_member})' : '')) . '
 			LEFT JOIN {db_prefix}moderators AS mods ON (mods.id_board = b.id_board)
-			LEFT JOIN {db_prefix}members AS mods_mem ON (mods_mem.id_member = mods.id_member)
+			LEFT JOIN {db_prefix}moderator_groups AS mods_g ON (mods_g.id_board = b.id_board)
+			LEFT JOIN {db_prefix}membergroups AS mods_grp ON (mods_grp.id_group = mods_g.id_group)
+			LEFT JOIN {db_prefix}members AS mods_mem ON (mods_mem.id_member = mods.id_member)' . (!empty($settings['avatars_on_indexes']) ? '
+			LEFT JOIN {db_prefix}attachments AS a ON (a.id_member = m.id_member)' : '') . '
 		WHERE {query_see_board}' . (empty($boardIndexOptions['countChildPosts']) ? (empty($boardIndexOptions['base_level']) ? '' : '
 			AND b.child_level >= {int:child_level}') : '
 			AND b.child_level BETWEEN ' . $boardIndexOptions['base_level'] . ' AND ' . ($boardIndexOptions['base_level'] + 1)),
@@ -102,7 +107,7 @@ function getBoardIndex($boardIndexOptions)
 					'boards' => array(),
 					'new' => false
 				);
-				$categories[$row_board['id_cat']]['link'] = '<a id="c' . $row_board['id_cat'] . '"></a>' . ($categories[$row_board['id_cat']]['can_collapse'] ? '<a href="' . $categories[$row_board['id_cat']]['collapse_href'] . '">' . $row_board['cat_name'] . '</a>' : $row_board['cat_name']);
+				$categories[$row_board['id_cat']]['link'] = '<a id="c' . $row_board['id_cat'] . '"></a>' . (!$context['user']['is_guest'] ? '<a href="' . $scripturl . '?action=unread;c='. $row_board['id_cat'] . '" title="' . sprintf($txt['new_posts_in_category'], strip_tags($row_board['cat_name'])) . '">' . $row_board['cat_name'] . '</a>' : $row_board['cat_name']);
 			}
 
 			// If this board has new posts in it (and isn't the recycle bin!) then the category is new.
@@ -135,7 +140,9 @@ function getBoardIndex($boardIndexOptions)
 					'name' => $row_board['board_name'],
 					'description' => $row_board['description'],
 					'moderators' => array(),
+					'moderator_groups' => array(),
 					'link_moderators' => array(),
+					'link_moderator_groups' => array(),
 					'children' => array(),
 					'link_children' => array(),
 					'children_new' => false,
@@ -159,6 +166,16 @@ function getBoardIndex($boardIndexOptions)
 				);
 				$this_category[$row_board['id_board']]['link_moderators'][] = '<a href="' . $scripturl . '?action=profile;u=' . $row_board['id_moderator'] . '" title="' . $txt['board_moderator'] . '">' . $row_board['mod_real_name'] . '</a>';
 			}
+			if (!empty($row_board['id_moderator_group']))
+			{
+				$this_category[$row_board['id_board']]['moderator_groups'][$row_board['id_moderator_group']] = array(
+					'id' => $row_board['id_moderator_group'],
+					'name' => $row_board['mod_group_name'],
+					'href' => $scripturl . '?action=groups;sa=members;group=' . $row_board['id_moderator_group'],
+					'link' => '<a href="' . $scripturl . '?action=groups;sa=members;group=' . $row_board['id_moderator_group'] . '" title="' . $txt['board_moderator'] . '">' . $row_board['mod_group_name'] . '</a>'
+				);
+				$this_category[$row_board['id_board']]['link_moderator_groups'][] = '<a href="' . $scripturl . '?action=groups;sa=members;group=' . $row_board['id_moderator_group'] . '" title="' . $txt['board_moderator'] . '">' . $row_board['mod_group_name'] . '</a>';
+			}
 		}
 		// Found a child board.... make sure we've found its parent and the child hasn't been set already.
 		elseif (isset($this_category[$row_board['id_parent']]['children']) && !isset($this_category[$row_board['id_parent']]['children'][$row_board['id_board']]))
@@ -170,6 +187,7 @@ function getBoardIndex($boardIndexOptions)
 				'id' => $row_board['id_board'],
 				'name' => $row_board['board_name'],
 				'description' => $row_board['description'],
+				'short_description' => shorten_subject(strip_tags($row_board['description']), 128),
 				'new' => empty($row_board['is_read']) && $row_board['poster_name'] != '',
 				'topics' => $row_board['num_topics'],
 				'posts' => $row_board['num_posts'],
@@ -228,6 +246,24 @@ function getBoardIndex($boardIndexOptions)
 		else
 			continue;
 
+		if (!empty($settings['avatars_on_indexes']))
+		{
+			// Allow themers to show the latest poster's avatar along with the board
+			if (!empty($row_board['avatar']))
+			{
+				if ($modSettings['avatar_action_too_large'] == 'option_html_resize' || $modSettings['avatar_action_too_large'] == 'option_js_resize')
+				{
+					$avatar_width = !empty($modSettings['avatar_max_width_external']) ? ' width="' . $modSettings['avatar_max_width_external'] . '"' : '';
+					$avatar_height = !empty($modSettings['avatar_max_height_external']) ? ' height="' . $modSettings['avatar_max_height_external'] . '"' : '';
+				}
+				else
+				{
+					$avatar_width = '';
+					$avatar_height = '';
+				}
+			}
+		}
+
 		// Prepare the subject, and make sure it's not too long.
 		censorText($row_board['subject']);
 		$row_board['short_subject'] = shorten_subject($row_board['subject'], 24);
@@ -246,6 +282,14 @@ function getBoardIndex($boardIndexOptions)
 			'start' => 'msg' . $row_board['new_from'],
 			'topic' => $row_board['id_topic']
 		);
+
+		if (!empty($settings['avatars_on_indexes']))
+			$this_last_post['member']['avatar'] = array(
+				'name' => $row_board['avatar'],
+				'image' => $row_board['avatar'] == '' ? ($row_board['id_attach'] > 0 ? '<img class="avatar" src="' . (empty($row_board['attachment_type']) ? $scripturl . '?action=dlattach;attach=' . $row_board['id_attach'] . ';type=avatar' : $modSettings['custom_avatar_url'] . '/' . $row_board['filename']) . '" alt="" />' : '') : (stristr($row_board['avatar'], 'http://') ? '<img class="avatar" src="' . $row_board['avatar'] . '"' . $avatar_width . $avatar_height . ' alt="" />' : '<img class="avatar" src="' . $modSettings['avatar_url'] . '/' . htmlspecialchars($row_board['avatar']) . '" alt="" />'),
+				'href' => $row_board['avatar'] == '' ? ($row_board['id_attach'] > 0 ? (empty($row_board['attachment_type']) ? $scripturl . '?action=dlattach;attach=' . $row_board['id_attach'] . ';type=avatar' : $modSettings['custom_avatar_url'] . '/' . $row_board['filename']) : '') : (stristr($row_board['avatar'], 'http://') ? $row_board['avatar'] : $modSettings['avatar_url'] . '/' . $row_board['avatar']),
+				'url' => $row_board['avatar'] == '' ? '' : (stristr($row_board['avatar'], 'http://') ? $row_board['avatar'] : $modSettings['avatar_url'] . '/' . $row_board['avatar'])
+			);
 
 		// Provide the href and link.
 		if ($row_board['subject'] != '')

@@ -7,14 +7,14 @@
  *
  * @package SMF
  * @author Simple Machines http://www.simplemachines.org
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
  */
 
 if (!defined('SMF'))
-	die('Hacking attempt...');
+	die('No direct access...');
 
 /**
  * Delete one or more members.
@@ -22,13 +22,13 @@ if (!defined('SMF'))
  * respectively removing your own account or any account.
  * Non-admins cannot delete admins.
  * The function:
- * - changes author of messages, topics and polls to guest authors.
- * - removes all log entries concerning the deleted members, except the
+ *   - changes author of messages, topics and polls to guest authors.
+ *   - removes all log entries concerning the deleted members, except the
  * error logs, ban logs and moderation logs.
- * - removes these members' personal messages (only the inbox), avatars,
+ *   - removes these members' personal messages (only the inbox), avatars,
  * ban entries, theme settings, moderator positions, poll votes, and
  * karma votes.
- * - updates member statistics afterwards.
+ *   - updates member statistics afterwards.
  *
  * @param array $users
  * @param bool $check_not_admin = false
@@ -39,7 +39,7 @@ function deleteMembers($users, $check_not_admin = false)
 
 	// Try give us a while to sort this out...
 	@set_time_limit(600);
-	
+
 	// Try to get some more memory.
 	setMemoryLimit('128M');
 
@@ -109,15 +109,19 @@ function deleteMembers($users, $check_not_admin = false)
 	if (empty($users))
 		return;
 
-	require_once($sourcedir . '/Logging.php');
 	// Log the action - regardless of who is deleting it.
-	$log_inserts = array();
+	$log_changes = array();
 	foreach ($user_log_details as $user)
 	{
-		// Integration rocks!
-		call_integration_hook('integrate_delete_member', array($user[0]));
-
-		logAction('delete_member', array('member' => $user[0], 'name' => $user[1], 'member_acted' => $user_info['name']), 'admin');
+		$log_changes[] = array(
+			'action' => 'delete_member',
+			'log_type' => 'admin',
+			'extra' => array(
+				'member' => $user[0],
+				'name' => $user[1],
+				'member_acted' => $user_info['name'],
+			),
+		);
 
 		// Remove any cached data if enabled.
 		if (!empty($modSettings['cache_enable']) && $modSettings['cache_enable'] >= 2)
@@ -199,6 +203,15 @@ function deleteMembers($users, $check_not_admin = false)
 	// Delete the member.
 	$smcFunc['db_query']('', '
 		DELETE FROM {db_prefix}members
+		WHERE id_member IN ({array_int:users})',
+		array(
+			'users' => $users,
+		)
+	);
+
+	// Delete any drafts...
+	$smcFunc['db_query']('', '
+		DELETE FROM {db_prefix}user_drafts
 		WHERE id_member IN ({array_int:users})',
 		array(
 			'users' => $users,
@@ -392,7 +405,13 @@ function deleteMembers($users, $check_not_admin = false)
 		'calendar_updated' => time(),
 	));
 
+	// Integration rocks!
+	call_integration_hook('integrate_delete_members', array($users));
+
 	updateStats('member');
+
+	require_once($sourcedir . '/Logging.php');
+	logActions($log_changes);
 }
 
 /**
@@ -450,34 +469,16 @@ function registerMember(&$regOptions, $return_errors = false)
 			$regOptions['auth_method'] = 'password';
 	}
 
-	// No name?!  How can you register with no name?
-	if (empty($regOptions['username']))
-		$reg_errors[] = array('lang', 'need_username');
-
 	// Spaces and other odd characters are evil...
 	$regOptions['username'] = preg_replace('~[\t\n\r\x0B\0' . ($context['utf8'] ? '\x{A0}' : '\xA0') . ']+~' . ($context['utf8'] ? 'u' : ''), ' ', $regOptions['username']);
-
-	// Don't use too long a name.
-	if ($smcFunc['strlen']($regOptions['username']) > 25)
-		$reg_errors[] = array('lang', 'error_long_name');
-
-	// Only these characters are permitted.
-	if (preg_match('~[<>&"\'=\\\\]~', preg_replace('~&#(?:\\d{1,7}|x[0-9a-fA-F]{1,6});~', '', $regOptions['username'])) != 0 || $regOptions['username'] == '_' || $regOptions['username'] == '|' || strpos($regOptions['username'], '[code') !== false || strpos($regOptions['username'], '[/code') !== false)
-		$reg_errors[] = array('lang', 'error_invalid_characters_username');
-
-	if ($smcFunc['strtolower']($regOptions['username']) === $smcFunc['strtolower']($txt['guest_title']))
-		$reg_errors[] = array('lang', 'username_reserved', 'general', array($txt['guest_title']));
 
 	// @todo Separate the sprintf?
 	if (empty($regOptions['email']) || preg_match('~^[0-9A-Za-z=_+\-/][0-9A-Za-z=_\'+\-/\.]*@[\w\-]+(\.[\w\-]+)*(\.[\w]{2,6})$~', $regOptions['email']) === 0 || strlen($regOptions['email']) > 255)
 		$reg_errors[] = array('done', sprintf($txt['valid_email_needed'], $smcFunc['htmlspecialchars']($regOptions['username'])));
 
-	if (!empty($regOptions['check_reserved_name']) && isReservedName($regOptions['username'], 0, false))
-	{
-		if ($regOptions['password'] == 'chocolate cake')
-			$reg_errors[] = array('done', 'Sorry, I don\'t take bribes... you\'ll need to come up with a different name.');
-		$reg_errors[] = array('done', '(' . htmlspecialchars($regOptions['username']) . ') ' . $txt['name_in_use']);
-	}
+	$username_validation_errors = validateUsername(0, $regOptions['username'], true, !empty($regOptions['check_reserved_name']));
+	if (!empty($username_validation_errors))
+		$reg_errors = array_merge($reg_errors, $username_validation_errors);
 
 	// Generate a validation code if it's supposed to be emailed.
 	$validation_code = '';
@@ -616,7 +617,7 @@ function registerMember(&$regOptions, $return_errors = false)
 		'icq' => '',
 		'aim' => '',
 		'yim' => '',
-		'msn' => '',
+		'skype' => '',
 		'time_format' => '',
 		'signature' => '',
 		'avatar' => '',
@@ -865,14 +866,7 @@ function isReservedName($name, $current_ID_MEMBER = 0, $is_name = true, $fatal =
 {
 	global $user_info, $modSettings, $smcFunc, $context;
 
-	// No cheating with entities please.
-	$replaceEntities = create_function('$string', '
-		$num = substr($string, 0, 1) === \'x\' ? hexdec(substr($string, 1)) : (int) $string;' . (empty($context['utf8']) ? '
-		return $num < 0x20 ? \'\' : ($num < 0x80 ? chr($num) : \'&#\' . $string . \';\');' : '
-		return $num < 0x20 || $num > 0x10FFFF || ($num >= 0xD800 && $num <= 0xDFFF) ? \'\' : ($num < 0x80 ? chr($num) : ($num < 0x800 ? chr(192 | $num >> 6) . chr(128 | $num & 63) : ($num < 0x10000 ? chr(224 | $num >> 12) . chr(128 | $num >> 6 & 63) . chr(128 | $num & 63) : chr(240 | $num >> 18) . chr(128 | $num >> 12 & 63) . chr(128 | $num >> 6 & 63) . chr(128 | $num & 63))));')
-	);
-
-	$name = preg_replace('~(&#(\d{1,7}|x[0-9a-fA-F]{1,6});)~e', '$replaceEntities(\'\\2\')', $name);
+	$name = preg_replace_callback('~(&#(\d{1,7}|x[0-9a-fA-F]{1,6});)~', 'replaceEntities__callback', $name);
 	$checkName = $smcFunc['strtolower']($name);
 
 	// Administrators are never restricted ;).
@@ -889,7 +883,7 @@ function isReservedName($name, $current_ID_MEMBER = 0, $is_name = true, $fatal =
 				continue;
 
 			// The admin might've used entities too, level the playing field.
-			$reservedCheck = preg_replace('~(&#(\d{1,7}|x[0-9a-fA-F]{1,6});)~e', '$replaceEntities(\'\\2\')', $reserved);
+			$reservedCheck = preg_replace('~(&#(\d{1,7}|x[0-9a-fA-F]{1,6});)~', 'replaceEntities__callback', $reserved);
 
 			// Case sensitive name?
 			if (empty($modSettings['reserveCase']))
@@ -1036,6 +1030,49 @@ function groupsAllowedTo($permission, $board_id = null)
 		while ($row = $smcFunc['db_fetch_assoc']($request))
 			$member_groups[$row['add_deny'] === '1' ? 'allowed' : 'denied'][] = $row['id_group'];
 		$smcFunc['db_free_result']($request);
+		
+		$moderator_groups = array();
+
+		// "Inherit" any moderator permissions as needed
+		if (isset($board_info['moderator_groups']))
+		{
+			$moderator_groups = array_keys($board_info['moderator_groups']);
+		}
+		elseif ($board_id !== 0)
+		{
+			// Get the groups that can moderate this board
+			$request = $smcFunc['db_query']('', '
+				SELECT id_group
+				FROM {db_prefix}moderator_groups
+				WHERE id_board = {int:board_id}',
+				array(
+					'board_id' => $board_id,
+				)
+			);
+			
+			while ($row = $smcFunc['db_fetch_assoc']($request))
+			{
+				$moderator_groups[] = $row['id_group'];
+			}
+		}
+		
+		$smcFunc['db_free_result']($request);
+		
+		// "Inherit" any additional permissions from the "Moderators" group		
+		foreach ($moderator_groups as $mod_group)
+		{
+			// If they're not specifically allowed, but the moderator group is, then allow it
+			if (in_array(3, $member_groups['allowed']) && !in_array($mod_group, $member_groups['allowed']))
+			{
+				$member_groups['allowed'][] = $mod_group;
+			}
+			
+			// They're not denied, but the moderator group is, so deny it
+			if (in_array(3, $member_groups['denied']) && !in_array($mod_group, $member_groups['denied']))
+			{
+				$member_groups['denied'][] = $mod_group;
+			}
+		}
 	}
 
 	// Denied is never allowed.
@@ -1060,6 +1097,8 @@ function membersAllowedTo($permission, $board_id = null)
 	global $smcFunc;
 
 	$member_groups = groupsAllowedTo($permission, $board_id);
+	
+	$all_groups = array_merge($member_groups['allowed'], $member_groups['denied']);
 
 	$include_moderators = in_array(3, $member_groups['allowed']) && $board_id !== null;
 	$member_groups['allowed'] = array_diff($member_groups['allowed'], array(3));
@@ -1070,12 +1109,14 @@ function membersAllowedTo($permission, $board_id = null)
 	$request = $smcFunc['db_query']('', '
 		SELECT mem.id_member
 		FROM {db_prefix}members AS mem' . ($include_moderators || $exclude_moderators ? '
-			LEFT JOIN {db_prefix}moderators AS mods ON (mods.id_member = mem.id_member AND mods.id_board = {int:board_id})' : '') . '
-		WHERE (' . ($include_moderators ? 'mods.id_member IS NOT NULL OR ' : '') . 'mem.id_group IN ({array_int:member_groups_allowed}) OR FIND_IN_SET({raw:member_group_allowed_implode}, mem.additional_groups) != 0)' . (empty($member_groups['denied']) ? '' : '
-			AND NOT (' . ($exclude_moderators ? 'mods.id_member IS NOT NULL OR ' : '') . 'mem.id_group IN ({array_int:member_groups_denied}) OR FIND_IN_SET({raw:member_group_denied_implode}, mem.additional_groups) != 0)'),
+			LEFT JOIN {db_prefix}moderators AS mods ON (mods.id_member = mem.id_member AND mods.id_board = {int:board_id})
+			LEFT JOIN {db_prefix}moderator_groups AS modgs ON (modgs.id_group IN ({array_int:all_member_groups}))' : '') . '
+		WHERE (' . ($include_moderators ? 'mods.id_member IS NOT NULL OR modgs.id_group IS NOT NULL OR ' : '') . 'mem.id_group IN ({array_int:member_groups_allowed}) OR FIND_IN_SET({raw:member_group_allowed_implode}, mem.additional_groups) != 0 OR mem.id_post_group IN ({array_int:member_groups_allowed}))' . (empty($member_groups['denied']) ? '' : '
+			AND NOT (' . ($exclude_moderators ? 'mods.id_member IS NOT NULL OR modgs.id_group IS NOT NULL OR ' : '') . 'mem.id_group IN ({array_int:member_groups_denied}) OR FIND_IN_SET({raw:member_group_denied_implode}, mem.additional_groups) != 0 OR mem.id_post_group IN ({array_int:member_groups_denied}))'),
 		array(
 			'member_groups_allowed' => $member_groups['allowed'],
 			'member_groups_denied' => $member_groups['denied'],
+			'all_member_groups' => $all_groups,
 			'board_id' => $board_id,
 			'member_group_allowed_implode' => implode(', mem.additional_groups) != 0 OR FIND_IN_SET(', $member_groups['allowed']),
 			'member_group_denied_implode' => implode(', mem.additional_groups) != 0 OR FIND_IN_SET(', $member_groups['denied']),
@@ -1177,9 +1218,9 @@ function reattributePosts($memID, $email = false, $membername = false, $post_cou
 			'memID' => $memID,
 		)
 	);
-	
+
 	// Allow mods with their own post tables to reattribute posts as well :)
- 	call_integration_hook('integrate_reattribute_posts', array(&$memID, &$email, &$membername, &$post_count));
+ 	call_integration_hook('integrate_reattribute_posts', array($memID, $email, $membername, $post_count));
 }
 
 /**
@@ -1231,11 +1272,11 @@ function list_getMembers($start, $items_per_page, $sort, $where, $where_params =
 
 	$request = $smcFunc['db_query']('', '
 		SELECT
-			mem.id_member, mem.member_name, mem.real_name, mem.email_address, mem.icq, mem.aim, mem.yim, mem.msn, mem.member_ip, mem.member_ip2, mem.last_login,
+			mem.id_member, mem.member_name, mem.real_name, mem.email_address, mem.icq, mem.aim, mem.yim, mem.skype, mem.member_ip, mem.member_ip2, mem.last_login,
 			mem.posts, mem.is_activated, mem.date_registered, mem.id_group, mem.additional_groups, mg.group_name
 		FROM {db_prefix}members AS mem
 			LEFT JOIN {db_prefix}membergroups AS mg ON (mg.id_group = mem.id_group)
-		WHERE ' . $where . '
+		WHERE ' . ($where == '1' ? '1=1' : $where) . '
 		ORDER BY {raw:sort}
 		LIMIT {int:start}, {int:per_page}',
 		array_merge($where_params, array(
@@ -1268,7 +1309,7 @@ function list_getNumMembers($where, $where_params = array())
 	global $smcFunc, $modSettings;
 
 	// We know how many members there are in total.
-	if (empty($where) || $where == '1')
+	if (empty($where) || $where == '1=1')
 		$num_members = $modSettings['totalMembers'];
 
 	// The database knows the amount when there are extra conditions.
@@ -1289,6 +1330,7 @@ function list_getNumMembers($where, $where_params = array())
 }
 
 /**
+ * Find potential duplicate registation members based on the same IP address
  *
  * @param $members
  */
@@ -1406,8 +1448,12 @@ function populateDuplicateMembers(&$members)
 		}
 }
 
-// Generate a random validation code.
-// @todo Err. Whatcha doin' here.
+/**
+ * Generate a random validation code.
+ * @todo Err. Whatcha doin' here.
+ *
+ * @return type
+ */
 function generateValidationCode()
 {
 	global $smcFunc, $modSettings;

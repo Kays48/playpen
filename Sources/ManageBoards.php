@@ -7,21 +7,20 @@
  *
  * @package SMF
  * @author Simple Machines http://www.simplemachines.org
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
  */
 
 if (!defined('SMF'))
-	die('Hacking attempt...');
+	die('No direct access...');
 
 /**
  * The main dispatcher; doesn't do anything, just delegates.
  * This is the main entry point for all the manageboards admin screens.
  * Called by ?action=admin;area=manageboards.
- * It checks the permissions, based on the sub-action, and calls a function
- *  based on the sub-action.
+ * It checks the permissions, based on the sub-action, and calls a function based on the sub-action.
  *
  *  @uses ManageBoards language file.
  */
@@ -369,7 +368,6 @@ function EditCategory2()
  * uses the modify_board sub-template of the ManageBoards template.
  * requires manage_boards permission.
  * also used to show the confirm deletion of category screen (sub-template confirm_board_delete).
-		  (sub-template confirm_board_delete).
 
  */
 function EditBoard()
@@ -549,6 +547,25 @@ function EditBoard()
 	if (!empty($context['board']['moderators']))
 		list ($context['board']['last_moderator_id']) = array_slice(array_keys($context['board']['moderators']), -1);
 
+	// Get all the groups assigned as moderators
+	$request = $smcFunc['db_query']('', '
+		SELECT id_group
+		FROM {db_prefix}moderator_groups
+		WHERE id_board = {int:current_board}',
+		array(
+			'current_board' => $_REQUEST['boardid'],
+		)
+	);
+	$context['board']['moderator_groups'] = array();
+	while ($row = $smcFunc['db_fetch_assoc']($request))
+		$context['board']['moderator_groups'][$row['id_group']] = $context['groups'][$row['id_group']]['name'];
+	$smcFunc['db_free_result']($request);
+	
+	$context['board']['moderator_groups_list'] = empty($context['board']['moderator_groups']) ? '' : '&quot;' . implode('&quot;, &qout;', $context['board']['moderator_groups']) . '&quot;';
+
+	if (!empty($context['board']['moderator_groups']))
+		list ($context['board']['last_moderator_group_id']) = array_slice(array_keys($context['board']['moderator_groups']), -1);
+
 	// Get all the themes...
 	$request = $smcFunc['db_query']('', '
 		SELECT id_theme AS id, value AS name
@@ -624,6 +641,7 @@ function EditBoard2()
 		$boardOptions['override_theme'] = isset($_POST['override_theme']);
 		$boardOptions['board_theme'] = (int) $_POST['boardtheme'];
 		$boardOptions['access_groups'] = array();
+		$boardOptions['deny_groups'] = array();
 
 		if (!empty($_POST['groups']))
 			foreach ($_POST['groups'] as $group => $action)
@@ -649,6 +667,16 @@ function EditBoard2()
 			foreach ($_POST['moderator_list'] as $moderator)
 				$moderators[(int) $moderator] = (int) $moderator;
 			$boardOptions['moderators'] = $moderators;
+		}
+
+		$boardOptions['moderator_group_string'] = $_POST['moderator_groups'];
+		
+		if (isset($_POST['moderator_group_list']) && is_array($_POST['moderator_group_list']))
+		{
+			$moderator_groups = array();
+			foreach ($_POST['moderator_group_list'] as $moderator_group)
+				$moderator_groups[(int) $moderator_group] = (int) $moderator_group;
+			$boardOptions['moderator_groups'] = $moderator_groups;
 		}
 
 		// Are they doing redirection?
@@ -725,6 +753,9 @@ function EditBoard2()
 		redirectexit('action=admin;area=manageboards');
 }
 
+/**
+ * Used to retrieve data for modifying a board category
+ */
 function ModifyCat()
 {
 	global $cat_tree, $boardList, $boards, $sourcedir, $smcFunc;
@@ -807,9 +838,7 @@ function EditBoardSettings($return_config = false)
 	if ($return_config)
 		return $config_vars;
 
-	// Needed for the settings template and inline permission functions.
-	// @todo is this file really needed?
-	require_once($sourcedir . '/ManagePermissions.php');
+	// Needed for the settings template.
 	require_once($sourcedir . '/ManageServer.php');
 
 	// Don't let guests have these permissions.

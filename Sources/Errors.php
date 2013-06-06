@@ -9,20 +9,21 @@
  *
  * @package SMF
  * @author Simple Machines http://www.simplemachines.org
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
  */
 
 if (!defined('SMF'))
-	die('Hacking attempt...');
+	die('No direct access...');
 
 /**
  * Log an error, if the error logging is enabled.
  * filename and line should be __FILE__ and __LINE__, respectively.
  * Example use:
  *  die(log_error($msg));
+ *
  * @param string $error_message
  * @param string $error_type = 'general'
  * @param string $file = null
@@ -31,7 +32,7 @@ if (!defined('SMF'))
  */
 function log_error($error_message, $error_type = 'general', $file = null, $line = null)
 {
-	global $txt, $modSettings, $sc, $user_info, $smcFunc, $scripturl, $last_error;
+	global $modSettings, $sc, $user_info, $smcFunc, $scripturl, $last_error;
 	static $tried_hook = false;
 
 	// Check if error logging is actually on.
@@ -119,7 +120,7 @@ function log_error($error_message, $error_type = 'general', $file = null, $line 
  */
 function fatal_error($error, $log = 'general')
 {
-	global $txt, $context, $modSettings;
+	global $txt, $modSettings;
 
 	// We don't have $txt yet, but that's okay...
 	if (empty($txt))
@@ -252,14 +253,15 @@ function error_handler($error_level, $error_string, $file, $line)
 
 	// We should NEVER get to this point.  Any fatal error MUST quit, or very bad things can happen.
 	if ($error_level % 255 == E_ERROR)
-		die('Hacking attempt...');
+		die('No direct access...');
 }
 
 /**
  * It is called by fatal_error() and fatal_lang_error().
- * @uses Errors template, fatal_error sub template, or Wireless template,
- * error sub template.
+ * @uses Errors template, fatal_error sub template, or Wireless template, error sub template.
+ *
  * @param string $error_message
+ * @param type $error_code
  */
 function setup_fatal_error_context($error_message, $error_code)
 {

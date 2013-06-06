@@ -8,14 +8,14 @@
  *
  * @package SMF
  * @author Simple Machines http://www.simplemachines.org
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
  */
 
 if (!defined('SMF'))
-	die('Hacking attempt...');
+	die('No direct access...');
 
 /**
  * Ask them for their login information. (shows a page for the user to type
@@ -28,7 +28,11 @@ if (!defined('SMF'))
  */
 function Login()
 {
-	global $txt, $context, $scripturl;
+	global $txt, $context, $scripturl, $user_info;
+
+	// You are already logged in, go take a tour of the boards
+	if (!empty($user_info['id']))
+		redirectexit();
 
 	// In wireless?  If so, use the correct sub template.
 	if (WIRELESS)
@@ -77,7 +81,7 @@ function Login()
 function Login2()
 {
 	global $txt, $scripturl, $user_info, $user_settings, $smcFunc;
-	global $cookiename, $maintenance, $modSettings, $context, $sc, $sourcedir;
+	global $cookiename, $modSettings, $context, $sc, $sourcedir;
 
 	// Load cookie authentication stuff.
 	require_once($sourcedir . '/Subs-Auth.php');
@@ -115,6 +119,11 @@ function Login2()
 		// Some whitelisting for login_url...
 		if (empty($_SESSION['login_url']))
 			redirectexit();
+		elseif (!empty($_SESSION['login_url']) && (strpos('http://', $_SESSION['login_url']) === false && strpos('https://', $_SESSION['login_url']) === false))
+		{
+			unset ($_SESSION['login_url']);
+			redirectexit();
+		}
 		else
 		{
 			// Best not to clutter the session data too much...
@@ -131,7 +140,7 @@ function Login2()
 
 	// Are you guessing with a script?
 	checkSession('post');
-	validateToken('login');
+	$tk = validateToken('login');
 	spamProtection('login');
 
 	// Set the login_url if it's not already set (but careful not to send us to an attachment).
@@ -257,7 +266,7 @@ function Login2()
 			return;
 		}
 		// Challenge passed.
-		elseif ($_POST['hash_passwrd'] == sha1($user_settings['passwd'] . $sc))
+		elseif ($_POST['hash_passwrd'] == sha1($user_settings['passwd'] . $sc . $tk))
 			$sha_passwd = $user_settings['passwd'];
 		else
 		{
@@ -292,7 +301,7 @@ function Login2()
 		$other_passwords = array();
 
 		// None of the below cases will be used most of the time (because the salt is normally set.)
-		if ($user_settings['password_salt'] == '')
+		if (!empty($modSettings['enable_password_conversion']) && $user_settings['password_salt'] == '')
 		{
 			// YaBB SE, Discus, MD5 (used a lot), SHA-1 (used some), SMF 1.0.x, IkonBoard, and none at all.
 			$other_passwords[] = crypt($_POST['passwrd'], substr($_POST['passwrd'], 0, 2));
@@ -318,10 +327,10 @@ function Login2()
 			$other_passwords[] = md5(crypt($_POST['passwrd'], 'CRYPT_MD5'));
 		}
 		// The hash should be 40 if it's SHA-1, so we're safe with more here too.
-		elseif (strlen($user_settings['passwd']) == 32)
+		elseif (!empty($modSettings['enable_password_conversion']) && strlen($user_settings['passwd']) == 32)
 		{
 			// vBulletin 3 style hashing?  Let's welcome them with open arms \o/.
-			$other_passwords[] = md5(md5($_POST['passwrd']) . $user_settings['password_salt']);
+			$other_passwords[] = md5(md5($_POST['passwrd']) . stripslashes($user_settings['password_salt']));
 
 			// Hmm.. p'raps it's Invision 2 style?
 			$other_passwords[] = md5(md5($user_settings['password_salt']) . md5($_POST['passwrd']));
@@ -336,7 +345,8 @@ function Login2()
 			$other_passwords[] = sha1(strtolower($user_settings['member_name']) . un_htmlspecialchars($_POST['passwrd']));
 
 			// BurningBoard3 style of hashing.
-			$other_passwords[] = sha1($user_settings['password_salt'] . sha1($user_settings['password_salt'] . sha1($_POST['passwrd'])));
+			if (!empty($modSettings['enable_password_conversion']))
+				$other_passwords[] = sha1($user_settings['password_salt'] . sha1($user_settings['password_salt'] . sha1($_POST['passwrd'])));
 
 			// Perhaps we converted to UTF-8 and have a valid password being hashed differently.
 			if ($context['character_set'] == 'utf8' && !empty($modSettings['previousCharacterSet']) && $modSettings['previousCharacterSet'] != 'utf8')
@@ -357,6 +367,9 @@ function Login2()
 			require_once($sourcedir . '/Subs-Compat.php');
 			$other_passwords[] = sha1_smf(strtolower($user_settings['member_name']) . un_htmlspecialchars($_POST['passwrd']));
 		}
+
+		// Allows mods to easily extend the $other_passwords array
+		call_integration_hook('integrate_other_passwords', array(&$other_passwords));
 
 		// Whichever encryption it was using, let's make it use SMF's now ;).
 		if (in_array($user_settings['passwd'], $other_passwords))
@@ -464,8 +477,8 @@ function checkActivation()
  */
 function DoLogin()
 {
-	global $txt, $scripturl, $user_info, $user_settings, $smcFunc;
-	global $cookiename, $maintenance, $modSettings, $context, $sourcedir;
+	global $user_info, $user_settings, $smcFunc;
+	global $maintenance, $modSettings, $context, $sourcedir;
 
 	// Load cookie authentication stuff.
 	require_once($sourcedir . '/Subs-Auth.php');
@@ -558,12 +571,12 @@ function DoLogin()
  * It redirects back to $_SESSION['logout_url'], if it exists.
  * It is accessed via ?action=logout;session_var=...
  *
- * @param bool $internal, if true, it doesn't check the session
+ * @param bool $internal if true, it doesn't check the session
  * @param $redirect
  */
 function Logout($internal = false, $redirect = true)
 {
-	global $sourcedir, $user_info, $user_settings, $context, $modSettings, $smcFunc;
+	global $sourcedir, $user_info, $user_settings, $context, $smcFunc;
 
 	// Make sure they aren't being auto-logged out.
 	if (!$internal)
@@ -607,6 +620,11 @@ function Logout($internal = false, $redirect = true)
 	{
 		if (empty($_SESSION['logout_url']))
 			redirectexit('', $context['server']['needs_login_fix']);
+		elseif (!empty($_SESSION['logout_url']) && (strpos('http://', $_SESSION['logout_url']) === false && strpos('https://', $_SESSION['logout_url']) === false))
+		{
+			unset ($_SESSION['logout_url']);
+			redirectexit();
+		}
 		else
 		{
 			$temp = $_SESSION['logout_url'];
@@ -696,7 +714,7 @@ function phpBB3_password_check($passwd, $passwd_hash)
  */
 function validatePasswordFlood($id_member, $password_flood_value = false, $was_correct = false)
 {
-	global $smcFunc, $cookiename, $sourcedir;
+	global $cookiename, $sourcedir;
 
 	// As this is only brute protection, we allow 5 attempts every 10 seconds.
 
@@ -721,12 +739,22 @@ function validatePasswordFlood($id_member, $password_flood_value = false, $was_c
 	if ($password_flood_value !== false)
 		@list ($time_stamp, $number_tries) = explode('|', $password_flood_value);
 
-	// Timestamp invalid or non-existent?
-	if (empty($number_tries) || $time_stamp < (time() - 10))
+	// Timestamp or number of tries invalid?
+	if (empty($number_tries) || empty($time_stamp))
 	{
-		// If it wasn't *that* long ago, don't give them another five goes.
-		$number_tries = !empty($number_tries) && $time_stamp < (time() - 20) ? 2 : 0;
+		$number_tries = 0;
 		$time_stamp = time();
+	}
+
+	// They've failed logging in already
+	if (!empty($number_tries))
+	{
+		// Give them less chances if they failed before
+		$number_tries = $time_stamp < time() - 20 ? 2 : $number_tries;
+
+		// They are trying too fast, make them wait longer
+		if ($time_stamp < time() - 10)
+			$time_stamp = time();
 	}
 
 	$number_tries++;

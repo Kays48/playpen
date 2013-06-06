@@ -4,7 +4,7 @@
  *
  * @package SMF
  * @author Simple Machines
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
@@ -22,7 +22,6 @@ function template_ask()
 				<h3 class="catbg">', $txt['split'], '</h3>
 			</div>
 			<div class="windowbg">
-				<span class="topslice"><span></span></span>
 				<div class="content">
 					<p class="split_topics">
 						<strong><label for="subname">', $txt['subject_new_topic'], '</label>:</strong>
@@ -40,11 +39,11 @@ function template_ask()
 						</li>
 					</ul>
 					<hr class="hrcolor" />
-					<input type="submit" value="', $txt['split'], '" class="button_submit" />
-					<br class="clear_right" />
+					<div class="auto_flow">
+						<input type="submit" value="', $txt['split'], '" class="button_submit" />
+						<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
+					</div>
 				</div>
-				<span class="botslice"><span></span></span>
-				<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
 			</div>
 		</form>
 	</div>';
@@ -60,7 +59,6 @@ function template_main()
 			<h3 class="catbg">', $txt['split'], '</h3>
 		</div>
 		<div class="windowbg">
-			<span class="topslice"><span></span></span>
 			<div class="content">
 				<p>', $txt['split_successful'], '</p>
 				<ul class="reset">
@@ -75,7 +73,6 @@ function template_main()
 					</li>
 				</ul>
 			</div>
-			<span class="botslice"><span></span></span>
 		</div>
 	</div>';
 }
@@ -95,14 +92,13 @@ function template_select()
 					', $txt['please_select_split'], '
 				</div>
 				<div class="pagesection">
-					<strong>', $txt['pages'], ':</strong> <span id="pageindex_not_selected">', $context['not_selected']['page_index'], '</span>
+					<span id="pageindex_not_selected">', $context['not_selected']['page_index'], '</span>
 				</div>
 				<ul id="messages_not_selected" class="split_messages smalltext reset">';
 
 	foreach ($context['not_selected']['messages'] as $message)
 		echo '
 					<li class="windowbg', $message['alternate'] ? '2' : '', '" id="not_selected_', $message['id'], '">
-						<span class="topslice"><span></span></span>
 						<div class="content">
 							<div class="message_header">
 								<a class="split_icon floatright" href="', $scripturl, '?action=splittopics;sa=selectTopics;subname=', $context['topic']['subject'], ';topic=', $context['topic']['id'], '.', $context['not_selected']['start'], ';start2=', $context['selected']['start'], ';move=down;msg=', $message['id'], '" onclick="return select(\'down\', ', $message['id'], ');"><img src="', $settings['images_url'], '/split_select.png" alt="-&gt;" /></a>
@@ -111,7 +107,6 @@ function template_select()
 							</div>
 							<div class="post">', $message['body'], '</div>
 						</div>
-						<span class="botslice"><span></span></span>
 					</li>';
 
 	echo '
@@ -128,7 +123,7 @@ function template_select()
 					', $txt['split_selected_posts_desc'], '
 				</div>
 				<div class="pagesection">
-					<strong>', $txt['pages'], ':</strong> <span id="pageindex_selected">', $context['selected']['page_index'], '</span>
+					<span id="pageindex_selected">', $context['selected']['page_index'], '</span>
 				</div>
 				<ul id="messages_selected" class="split_messages smalltext reset">';
 
@@ -136,7 +131,6 @@ function template_select()
 		foreach ($context['selected']['messages'] as $message)
 			echo '
 					<li class="windowbg', $message['alternate'] ? '2' : '', '" id="selected_', $message['id'], '">
-						<span class="topslice"><span></span></span>
 						<div class="content">
 							<div class="message_header">
 								<a class="split_icon floatleft" href="', $scripturl, '?action=splittopics;sa=selectTopics;subname=', $context['topic']['subject'], ';topic=', $context['topic']['id'], '.', $context['not_selected']['start'], ';start2=', $context['selected']['start'], ';move=up;msg=', $message['id'], '" onclick="return select(\'up\', ', $message['id'], ');"><img src="', $settings['images_url'], '/split_deselect.png" alt="&lt;-" /></a>
@@ -145,7 +139,6 @@ function template_select()
 							</div>
 							<div class="post">', $message['body'], '</div>
 						</div>
-						<span class="botslice"><span></span></span>
 					</li>';
 
 	echo '
@@ -153,86 +146,85 @@ function template_select()
 				</ul>
 			</div>
 			<br class="clear" />
-			<p>
+			<div class="flow_auto">
 				<input type="hidden" name="topic" value="', $context['current_topic'], '" />
 				<input type="hidden" name="subname" value="', $context['new_subject'], '" />
 				<input type="submit" value="', $txt['split'], '" class="button_submit" />
 				<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
-			</p>
+			</div>
 		</form>
 	</div>
-	<br class="clear" />
-		<script type="text/javascript"><!-- // --><![CDATA[
-			var start = new Array();
-			start[0] = ', $context['not_selected']['start'], ';
-			start[1] = ', $context['selected']['start'], ';
+	<script type="text/javascript"><!-- // --><![CDATA[
+		var start = new Array();
+		start[0] = ', $context['not_selected']['start'], ';
+		start[1] = ', $context['selected']['start'], ';
 
-			function select(direction, msg_id)
+		function select(direction, msg_id)
+		{
+			if (window.XMLHttpRequest)
 			{
-				if (window.XMLHttpRequest)
-				{
-					getXMLDocument(smf_prepareScriptUrl(smf_scripturl) + "action=splittopics;sa=selectTopics;subname=', $context['topic']['subject'], ';topic=', $context['topic']['id'], '." + start[0] + ";start2=" + start[1] + ";move=" + direction + ";msg=" + msg_id + ";xml", onDocReceived);
-					return false;
-				}
+				getXMLDocument(smf_prepareScriptUrl(smf_scripturl) + "action=splittopics;sa=selectTopics;subname=', $context['topic']['subject'], ';topic=', $context['topic']['id'], '." + start[0] + ";start2=" + start[1] + ";move=" + direction + ";msg=" + msg_id + ";xml", onDocReceived);
+				return false;
+			}
+			else
+				return true;
+		}
+		function onDocReceived(XMLDoc)
+		{
+			var i, j, pageIndex;
+			for (i = 0; i < 2; i++)
+			{
+				pageIndex = XMLDoc.getElementsByTagName("pageIndex")[i];
+				setInnerHTML(document.getElementById("pageindex_" + pageIndex.getAttribute("section")), pageIndex.firstChild.nodeValue);
+				start[i] = pageIndex.getAttribute("startFrom");
+			}
+			var numChanges = XMLDoc.getElementsByTagName("change").length;
+			var curChange, curSection, curAction, curId, curList, curData, newItem, sInsertBeforeId;
+			for (i = 0; i < numChanges; i++)
+			{
+				curChange = XMLDoc.getElementsByTagName("change")[i];
+				curSection = curChange.getAttribute("section");
+				curAction = curChange.getAttribute("curAction");
+				curId = curChange.getAttribute("id");
+				curList = document.getElementById("messages_" + curSection);
+				if (curAction == "remove")
+					curList.removeChild(document.getElementById(curSection + "_" + curId));
+				// Insert a message.
 				else
-					return true;
-			}
-			function onDocReceived(XMLDoc)
-			{
-				var i, j, pageIndex;
-				for (i = 0; i < 2; i++)
 				{
-					pageIndex = XMLDoc.getElementsByTagName("pageIndex")[i];
-					setInnerHTML(document.getElementById("pageindex_" + pageIndex.getAttribute("section")), pageIndex.firstChild.nodeValue);
-					start[i] = pageIndex.getAttribute("startFrom");
-				}
-				var numChanges = XMLDoc.getElementsByTagName("change").length;
-				var curChange, curSection, curAction, curId, curList, curData, newItem, sInsertBeforeId;
-				for (i = 0; i < numChanges; i++)
-				{
-					curChange = XMLDoc.getElementsByTagName("change")[i];
-					curSection = curChange.getAttribute("section");
-					curAction = curChange.getAttribute("curAction");
-					curId = curChange.getAttribute("id");
-					curList = document.getElementById("messages_" + curSection);
-					if (curAction == "remove")
-						curList.removeChild(document.getElementById(curSection + "_" + curId));
-					// Insert a message.
-					else
+					// By default, insert the element at the end of the list.
+					sInsertBeforeId = null;
+					// Loop through the list to try and find an item to insert after.
+					oListItems = curList.getElementsByTagName("LI");
+					for (j = 0; j < oListItems.length; j++)
 					{
-						// By default, insert the element at the end of the list.
-						sInsertBeforeId = null;
-						// Loop through the list to try and find an item to insert after.
-						oListItems = curList.getElementsByTagName("LI");
-						for (j = 0; j < oListItems.length; j++)
+						if (parseInt(oListItems[j].id.substr(curSection.length + 1)) < curId)
 						{
-							if (parseInt(oListItems[j].id.substr(curSection.length + 1)) < curId)
-							{
-								// This would be a nice place to insert the row.
-								sInsertBeforeId = oListItems[j].id;
-								// We\'re done for now. Escape the loop.
-								j = oListItems.length + 1;
-							}
+							// This would be a nice place to insert the row.
+							sInsertBeforeId = oListItems[j].id;
+							// We\'re done for now. Escape the loop.
+							j = oListItems.length + 1;
 						}
-
-						// Let\'s create a nice container for the message.
-						newItem = document.createElement("LI");
-						newItem.className = "windowbg2";
-						newItem.id = curSection + "_" + curId;
-						newItem.innerHTML = "<span class=\\"topslice\\"><span></span></span><div class=\\"content\\"><div class=\\"message_header\\"><a class=\\"split_icon float" + (curSection == "selected" ? "left" : "right") + "\\" href=\\"" + smf_prepareScriptUrl(smf_scripturl) + "action=splittopics;sa=selectTopics;subname=', $context['topic']['subject'], ';topic=', $context['topic']['id'], '.', $context['not_selected']['start'], ';start2=', $context['selected']['start'], ';move=" + (curSection == "selected" ? "up" : "down") + ";msg=" + curId + "\\" onclick=\\"return select(\'" + (curSection == "selected" ? "up" : "down") + "\', " + curId + ");\\"><img src=\\"', $settings['images_url'], '/split_" + (curSection == "selected" ? "de" : "") + "select.png\\" alt=\\"" + (curSection == "selected" ? "&lt;-" : "-&gt;") + "\\" /></a><strong>" + curChange.getElementsByTagName("subject")[0].firstChild.nodeValue + "</strong> ', $txt['by'], ' <strong>" + curChange.getElementsByTagName("poster")[0].firstChild.nodeValue + "</strong><br /><em>" + curChange.getElementsByTagName("time")[0].firstChild.nodeValue + "</em></div><div class=\\"post\\">" + curChange.getElementsByTagName("body")[0].firstChild.nodeValue + "</div></div><span class=\\"botslice\\"><span></span></span>";
-
-						// So, where do we insert it?
-						if (typeof sInsertBeforeId == "string")
-							curList.insertBefore(newItem, document.getElementById(sInsertBeforeId));
-						else
-							curList.appendChild(newItem);
 					}
+
+					// Let\'s create a nice container for the message.
+					newItem = document.createElement("LI");
+					newItem.className = "windowbg2";
+					newItem.id = curSection + "_" + curId;
+					newItem.innerHTML = "<div class=\\"content\\"><div class=\\"message_header\\"><a class=\\"split_icon float" + (curSection == "selected" ? "left" : "right") + "\\" href=\\"" + smf_prepareScriptUrl(smf_scripturl) + "action=splittopics;sa=selectTopics;subname=', $context['topic']['subject'], ';topic=', $context['topic']['id'], '.', $context['not_selected']['start'], ';start2=', $context['selected']['start'], ';move=" + (curSection == "selected" ? "up" : "down") + ";msg=" + curId + "\\" onclick=\\"return select(\'" + (curSection == "selected" ? "up" : "down") + "\', " + curId + ");\\"><img src=\\"', $settings['images_url'], '/split_" + (curSection == "selected" ? "de" : "") + "select.png\\" alt=\\"" + (curSection == "selected" ? "&lt;-" : "-&gt;") + "\\" /></a><strong>" + curChange.getElementsByTagName("subject")[0].firstChild.nodeValue + "</strong> ', $txt['by'], ' <strong>" + curChange.getElementsByTagName("poster")[0].firstChild.nodeValue + "</strong><br /><em>" + curChange.getElementsByTagName("time")[0].firstChild.nodeValue + "</em></div><div class=\\"post\\">" + curChange.getElementsByTagName("body")[0].firstChild.nodeValue + "</div></div>";
+
+					// So, where do we insert it?
+					if (typeof sInsertBeforeId == "string")
+						curList.insertBefore(newItem, document.getElementById(sInsertBeforeId));
+					else
+						curList.appendChild(newItem);
 				}
-				// After all changes, make sure the window backgrounds are still correct for both lists.
-				applyWindowClasses(document.getElementById("messages_selected"));
-				applyWindowClasses(document.getElementById("messages_not_selected"));
 			}
-		// ]]></script>';
+			// After all changes, make sure the window backgrounds are still correct for both lists.
+			applyWindowClasses(document.getElementById("messages_selected"));
+			applyWindowClasses(document.getElementById("messages_not_selected"));
+		}
+	// ]]></script>';
 }
 
 function template_merge_done()
@@ -245,7 +237,6 @@ function template_merge_done()
 				<h3 class="catbg">', $txt['merge'], '</h3>
 			</div>
 			<div class="windowbg">
-				<span class="topslice"><span></span></span>
 				<div class="content">
 					<p>', $txt['merge_successful'], '</p>
 					<br />
@@ -258,7 +249,6 @@ function template_merge_done()
 						</li>
 					</ul>
 				</div>
-				<span class="botslice"><span></span></span>
 			</div>
 		</div>
 	<br class="clear" />';
@@ -277,7 +267,6 @@ function template_merge()
 				', $txt['merge_desc'], '
 			</div>
 			<div class="windowbg">
-				<span class="topslice"><span></span></span>
 				<div class="content">
 					<dl class="settings merge_topic">
 						<dt>
@@ -326,16 +315,14 @@ function template_merge()
 		echo '
 					</dl>
 				</div>
-				<span class="botslice"><span></span></span>
 			</div><br />
 			<div class="cat_bar">
 				<h3 class="catbg">', $txt['target_topic'], '</h3>
 			</div>
 			<div class="pagesection">
-				<strong>', $txt['pages'], ':</strong> ', $context['page_index'], '
+				', $context['page_index'], '
 			</div>
 			<div class="windowbg2">
-				<span class="topslice"><span></span></span>
 				<div class="content">
 					<ul class="reset merge_topics">';
 
@@ -351,13 +338,11 @@ function template_merge()
 		echo '
 					</ul>
 				</div>
-				<span class="botslice"><span></span></span>
 			</div>
 			<div class="pagesection">
-				<strong>', $txt['pages'], ':</strong> ', $context['page_index'], '
+				', $context['page_index'], '
 			</div>
-		</div>
-	<br class="clear" />';
+		</div>';
 }
 
 function template_merge_extra_options()
@@ -407,7 +392,6 @@ function template_merge_extra_options()
 			</table>
 			<br />
 			<div class="windowbg">
-				<span class="topslice"><span></span></span>
 				<div class="content">';
 
 	echo '
@@ -459,16 +443,15 @@ function template_merge_extra_options()
 					</fieldset>';
 	}
 	echo '
-					<input type="submit" value="' . $txt['merge'] . '" class="button_submit" />
-					<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
-					<input type="hidden" name="sa" value="execute" />
-					<br class="clear_right" />
+					<div class="auto_flow">
+						<input type="submit" value="' . $txt['merge'] . '" class="button_submit" />
+						<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
+						<input type="hidden" name="sa" value="execute" />
+					</div>
 				</div>
-				<span class="botslice"><span></span></span>
 			</div>
 		</form>
-	</div>
-	<br class="clear" />';
+	</div>';
 }
 
 ?>

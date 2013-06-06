@@ -4,7 +4,7 @@
  *
  * @package SMF
  * @author Simple Machines
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
@@ -46,11 +46,10 @@ function template_main()
 		<form action="', $scripturl, '?action=emailuser;sa=sendtopic;topic=', $context['current_topic'], '.', $context['start'], '" method="post" accept-charset="', $context['character_set'], '">
 			<div class="cat_bar">
 				<h3 class="catbg">
-					<span class="ie6_header floatleft"><img src="', $settings['images_url'], '/email_sm.png" alt="" class="icon" />', $context['page_title'], '</span>
+					<img src="', $settings['images_url'], '/email_sm.png" alt="" class="icon" />', $context['page_title'], '
 				</h3>
 			</div>
 			<div class="windowbg2">
-			<span class="topslice"><span></span></span>
 				<div class="content">
 					<fieldset id="sender" class="send_topic">
 						<dl class="settings send_topic">
@@ -90,16 +89,14 @@ function template_main()
 							</dd>
 						</dl>
 					</fieldset>
-					<div class="righttext">
+					<div class="flow_auto">
 						<input type="submit" name="send" value="', $txt['sendtopic_send'], '" class="button_submit" />
+						<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
 					</div>
 				</div>
-				<span class="botslice"><span></span></span>
 			</div>
-			<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
 		</form>
-	</div>
-	<br class="clear" />';
+	</div>';
 }
 
 // Send an email to a user!
@@ -112,11 +109,10 @@ function template_custom_email()
 		<form action="', $scripturl, '?action=emailuser;sa=email" method="post" accept-charset="', $context['character_set'], '">
 			<div class="cat_bar">
 				<h3 class="catbg">
-					<span class="ie6_header floatleft"><img src="', $settings['images_url'], '/email_sm.png" alt="" class="icon" />', $context['page_title'], '</span>
+					<img src="', $settings['images_url'], '/email_sm.png" alt="" class="icon" />', $context['page_title'], '
 				</h3>
 			</div>
 			<div class="windowbg">
-				<span class="topslice"><span></span></span>
 				<div class="content">
 					<dl class="settings send_mail">
 						<dt>
@@ -181,10 +177,10 @@ function template_custom_email()
 						</dd>
 					</dl>
 					<hr class="hrcolor" />
-					<input type="submit" name="send" value="', $txt['sendtopic_send'], '" class="button_submit" />
-					<br class="clear_right" />
+					<div class="flow_auto">
+						<input type="submit" name="send" value="', $txt['sendtopic_send'], '" class="button_submit" />
+					</div>
 				</div>
-				<span class="botslice"><span></span></span>
 			</div>';
 
 	foreach ($context['form_hidden_vars'] as $key => $value)
@@ -194,8 +190,7 @@ function template_custom_email()
 	echo '
 			<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
 		</form>
-	</div>
-	<br class="clear" />';
+	</div>';
 }
 
 function template_report()
@@ -210,26 +205,30 @@ function template_report()
 					<h3 class="catbg">', $txt['report_to_mod'], '</h3>
 				</div>
 				<div class="windowbg">
-					<span class="topslice"><span></span></span>
 					<div class="content">';
 
 	if (!empty($context['post_errors']))
 	{
-		echo '
-				<div class="errorbox">
-					<ul>';
+	echo '
+				<div id="error_box" class="errorbox">
+					<ul id="error_list">';
 
-		foreach ($context['post_errors'] as $error)
+		foreach ($context['post_errors'] as $key => $error)
 			echo '
-						<li class="error">', $error, '</li>';
+						<li id="error_', $key, '" class="error">', $error, '</li>';
 
 		echo '
-					</ul>
-				</div>';
+					</ul>';
 	}
+	else
+		echo '
+				<div style="display:none" id="error_box" class="errorbox">';
+
+		echo '
+				</div>';
 
 	echo '
-						<p>', $txt['report_to_mod_func'], '</p>
+						<p class="noticebox">', $txt['report_to_mod_func'], '</p>
 						<br />
 						<dl class="settings" id="report_post">';
 
@@ -249,7 +248,7 @@ function template_report()
 								<label for="report_comment">', $txt['enter_comment'], '</label>:
 							</dt>
 							<dd>
-								<input type="text" id="report_comment" name="comment" size="50" value="', $context['comment_body'], '" maxlength="255" />
+								<textarea type="text" id="report_comment" name="comment" rows="5">', $context['comment_body'], '</textarea>
 							</dd>';
 
 	if ($context['require_verification'])
@@ -265,14 +264,12 @@ function template_report()
 
 	echo '
 						</dl>
-						<div class="righttext">
+						<div class="flow_auto">
 							<input type="submit" name="save" value="', $txt['rtm10'], '" style="margin-left: 1ex;" class="button_submit" />
+							<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
 						</div>
 					</div>
-					<br class="clear" />
-					<span class="botslice"><span></span></span>
 				</div>
-			<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
 		</form>
 	</div>';
 }

@@ -5,14 +5,14 @@
  *
  * @package SMF
  * @author Simple Machines http://www.simplemachines.org
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
  */
 
 if (!defined('SMF'))
-	die('Hacking attempt...');
+	die('No direct access...');
 
 /**
  * View a summary.
@@ -42,6 +42,11 @@ function summary($memID)
 
 	// Are there things we don't show?
 	$context['disabled_fields'] = isset($modSettings['disabled_profile_fields']) ? array_flip(explode(',', $modSettings['disabled_profile_fields'])) : array();
+	// Menu tab
+	$context[$context['profile_menu_name']]['tab_data'] = array(
+		'title' => $txt['summary'],
+		'icon' => 'profile_hd.png'
+	);
 
 	// See if they have broken any warning levels...
 	list ($modSettings['warning_enable'], $modSettings['user_limit']) = explode(',', $modSettings['warning_settings']);
@@ -184,7 +189,7 @@ function summary($memID)
 /**
  * Show all posts by the current user
  * @todo This function needs to be split up properly.
- * 
+ *
  * @param int $memID id_member
  */
 function showPosts($memID)
@@ -200,11 +205,13 @@ function showPosts($memID)
 	$context[$context['profile_menu_name']]['tab_data'] = array(
 		'title' => $txt['showPosts'],
 		'description' => $txt['showPosts_help'],
-		'icon' => 'profile_sm.png',
+		'icon' => 'profile_hd.png',
 		'tabs' => array(
 			'messages' => array(
 			),
 			'topics' => array(
+			),
+			'disregardedtopics' => array(
 			),
 			'attach' => array(
 			),
@@ -221,6 +228,9 @@ function showPosts($memID)
 	// If we're specifically dealing with attachments use that function!
 	if (isset($_GET['sa']) && $_GET['sa'] == 'attach')
 		return showAttachments($memID);
+	// Instead, if we're dealing with disregarded topics (and the feature is enabled) use that other function.
+	elseif (isset($_GET['sa']) && $_GET['sa'] == 'disregardedtopics' && $modSettings['enable_disregard'])
+		return showDisregarded($memID);
 
 	// Are we just viewing topics?
 	$context['is_topics'] = isset($_GET['sa']) && $_GET['sa'] == 'topics' ? true : false;
@@ -510,7 +520,7 @@ function showPosts($memID)
 
 /**
  * Show all the attachments of a user.
- * 
+ *
  * @param int $memID id_member
  */
 function showAttachments($memID)
@@ -520,10 +530,176 @@ function showAttachments($memID)
 
 	// OBEY permissions!
 	$boardsAllowed = boardsAllowedTo('view_attachments');
-	
+
 	// Make sure we can't actually see anything...
 	if (empty($boardsAllowed))
 		$boardsAllowed = array(-1);
+
+	require_once($sourcedir . '/Subs-List.php');
+
+	// This is all the information required to list attachments.
+	$listOptions = array(
+		'id' => 'attachments',
+		'width' => '100%',
+		'items_per_page' => $modSettings['defaultMaxMessages'],
+		'no_items_label' => $txt['show_attachments_none'],
+		'base_href' => $scripturl . '?action=profile;area=showposts;sa=attach;u=' . $memID,
+		'default_sort_col' => 'filename',
+		'get_items' => array(
+			'function' => 'list_getAttachments',
+			'params' => array(
+				$boardsAllowed,
+				$memID,
+			),
+		),
+		'get_count' => array(
+			'function' => 'list_getNumAttachments',
+			'params' => array(
+				$boardsAllowed,
+				$memID,
+			),
+		),
+		'data_check' => array(
+			'class' => create_function('$data', '
+				return $data[\'approved\'] ? \'\' : \'approvebg\';
+			')
+		),
+		'columns' => array(
+			'filename' => array(
+				'header' => array(
+					'value' => $txt['show_attach_downloads'],
+					'class' => 'lefttext',
+					'style' => 'width: 25%;',
+				),
+				'data' => array(
+					'db' => 'filename',
+				),
+				'sort' => array(
+					'default' => 'a.filename',
+					'reverse' => 'a.filename DESC',
+				),
+			),
+			'downloads' => array(
+				'header' => array(
+					'value' => $txt['show_attach_downloads'],
+					'style' => 'width: 12%;',
+				),
+				'data' => array(
+					'db' => 'downloads',
+					'comma_format' => true,
+				),
+				'sort' => array(
+					'default' => 'a.downloads',
+					'reverse' => 'a.downloads DESC',
+				),
+			),
+			'subject' => array(
+				'header' => array(
+					'value' => $txt['message'],
+					'class' => 'lefttext',
+					'style' => 'width: 30%;',
+				),
+				'data' => array(
+					'db' => 'subject',
+				),
+				'sort' => array(
+					'default' => 'm.subject',
+					'reverse' => 'm.subject DESC',
+				),
+			),
+			'posted' => array(
+				'header' => array(
+					'value' => $txt['show_attach_posted'],
+					'class' => 'lefttext',
+				),
+				'data' => array(
+					'db' => 'posted',
+					'timeformat' => true,
+				),
+				'sort' => array(
+					'default' => 'm.poster_time',
+					'reverse' => 'm.poster_time DESC',
+				),
+			),
+		),
+	);
+
+	// Create the request list.
+	createList($listOptions);
+
+}
+
+/**
+ * Get a list of attachments for this user
+ *
+ * @param int $start
+ * @param int $items_per_page
+ * @param string $sort
+ * @param array $boardsAllowed
+ * @param ing $memID
+ * @return array
+ */
+function list_getAttachments($start, $items_per_page, $sort, $boardsAllowed, $memID)
+{
+	global $smcFunc, $board, $modSettings, $context;
+
+	// Retrieve some attachments.
+	$request = $smcFunc['db_query']('', '
+		SELECT a.id_attach, a.id_msg, a.filename, a.downloads, a.approved, m.id_msg, m.id_topic,
+			m.id_board, m.poster_time, m.subject, b.name
+		FROM {db_prefix}attachments AS a
+			INNER JOIN {db_prefix}messages AS m ON (m.id_msg = a.id_msg)
+			INNER JOIN {db_prefix}boards AS b ON (b.id_board = m.id_board AND {query_see_board})
+		WHERE a.attachment_type = {int:attachment_type}
+			AND a.id_msg != {int:no_message}
+			AND m.id_member = {int:current_member}' . (!empty($board) ? '
+			AND b.id_board = {int:board}' : '') . (!in_array(0, $boardsAllowed) ? '
+			AND b.id_board IN ({array_int:boards_list})' : '') . (!$modSettings['postmod_active'] || $context['user']['is_owner'] ? '' : '
+			AND m.approved = {int:is_approved}') . '
+		ORDER BY {raw:sort}
+		LIMIT {int:offset}, {int:limit}',
+		array(
+			'boards_list' => $boardsAllowed,
+			'attachment_type' => 0,
+			'no_message' => 0,
+			'current_member' => $memID,
+			'is_approved' => 1,
+			'board' => $board,
+			'sort' => $sort,
+			'offset' => $start,
+			'limit' => $items_per_page,
+		)
+	);
+	$attachments = array();
+	while ($row = $smcFunc['db_fetch_assoc']($request))
+		$attachments[] = array(
+			'id' => $row['id_attach'],
+			'filename' => $row['filename'],
+			'downloads' => $row['downloads'],
+			'subject' => censorText($row['subject']),
+			'posted' => $row['poster_time'],
+			'msg' => $row['id_msg'],
+			'topic' => $row['id_topic'],
+			'board' => $row['id_board'],
+			'board_name' => $row['name'],
+			'approved' => $row['approved'],
+		);
+
+	$smcFunc['db_free_result']($request);
+
+	return $attachments;
+}
+
+/**
+ * Gets the total number of attachments for the user
+ *
+ * @param type $boardsAllowed
+ * @param type $memID
+ * @return type
+ */
+function list_getNumAttachments($boardsAllowed, $memID)
+{
+	global $board, $smcFunc, $modSettings, $context;
 
 	// Get the total number of attachments they have posted.
 	$request = $smcFunc['db_query']('', '
@@ -549,74 +725,220 @@ function showAttachments($memID)
 	list ($attachCount) = $smcFunc['db_fetch_row']($request);
 	$smcFunc['db_free_result']($request);
 
-	$maxIndex = (int) $modSettings['defaultMaxMessages'];
+	return $attachCount;
+}
 
-	// What about ordering?
-	$sortTypes = array(
-		'filename' => 'a.filename',
-		'downloads' => 'a.downloads',
-		'subject' => 'm.subject',
-		'posted' => 'm.poster_time',
+/**
+ * Show all the disregarded topics.
+ *
+ * @param int $memID id_member
+ */
+function showDisregarded($memID)
+{
+	global $txt, $user_info, $scripturl, $modSettings, $board, $context, $sourcedir, $smcFunc;
+
+	// Only the owner can see the list (if the function is enabled of course)
+	if ($user_info['id'] != $memID || !$modSettings['enable_disregard'])
+		return;
+
+	require_once($sourcedir . '/Subs-List.php');
+
+	// And here they are: the topics you don't like
+	$listOptions = array(
+		'id' => 'disregarded_topics',
+		'width' => '100%',
+		'items_per_page' => $modSettings['defaultMaxMessages'],
+		'no_items_label' => $txt['disregarded_topics_none'],
+		'base_href' => $scripturl . '?action=profile;area=showposts;sa=disregardedtopics;u=' . $memID,
+		'default_sort_col' => 'started_on',
+		'get_items' => array(
+			'function' => 'list_getDisregarded',
+			'params' => array(
+				$memID,
+			),
+		),
+		'get_count' => array(
+			'function' => 'list_getNumDisregarded',
+			'params' => array(
+				$memID,
+			),
+		),
+		'columns' => array(
+			'subject' => array(
+				'header' => array(
+					'value' => $txt['subject'],
+					'class' => 'lefttext',
+					'style' => 'width: 30%;',
+				),
+				'data' => array(
+					'sprintf' => array(
+						'format' => '<a href="' . $scripturl . '?topic=%1$d.0">%2$s</a>',
+						'params' => array(
+							'id_topic' => false,
+							'subject' => false,
+						),
+					),
+				),
+				'sort' => array(
+					'default' => 'm.subject',
+					'reverse' => 'm.subject DESC',
+				),
+			),
+			'started_by' => array(
+				'header' => array(
+					'value' => $txt['started_by'],
+					'style' => 'width: 15%;',
+				),
+				'data' => array(
+					'db' => 'started_by',
+				),
+				'sort' => array(
+					'default' => 'mem.real_name',
+					'reverse' => 'mem.real_name DESC',
+				),
+			),
+			'started_on' => array(
+				'header' => array(
+					'value' => $txt['on'],
+					'class' => 'lefttext',
+					'style' => 'width: 20%;',
+				),
+				'data' => array(
+					'db' => 'started_on',
+					'timeformat' => true,
+				),
+				'sort' => array(
+					'default' => 'm.poster_time',
+					'reverse' => 'm.poster_time DESC',
+				),
+			),
+			'last_post_by' => array(
+				'header' => array(
+					'value' => $txt['last_post'],
+					'style' => 'width: 15%;',
+				),
+				'data' => array(
+					'db' => 'last_post_by',
+				),
+				'sort' => array(
+					'default' => 'mem.real_name',
+					'reverse' => 'mem.real_name DESC',
+				),
+			),
+			'last_post_on' => array(
+				'header' => array(
+					'value' => $txt['on'],
+					'class' => 'lefttext',
+					'style' => 'width: 20%;',
+				),
+				'data' => array(
+					'db' => 'last_post_on',
+					'timeformat' => true,
+				),
+				'sort' => array(
+					'default' => 'm.poster_time',
+					'reverse' => 'm.poster_time DESC',
+				),
+			),
+		),
 	);
-	$context['sort_order'] = isset($_GET['sort']) && isset($sortTypes[$_GET['sort']]) ? $_GET['sort'] : 'posted';
-	$context['sort_direction'] = isset($_GET['asc']) ? 'up' : 'down';
 
-	$sort = $sortTypes[$context['sort_order']];
+	// Create the request list.
+	createList($listOptions);
 
-	// Let's get ourselves a lovely page index.
-	$context['page_index'] = constructPageIndex($scripturl . '?action=profile;u=' . $memID . ';area=showposts;sa=attach;sort=' . $context['sort_order'] . ($context['sort_direction'] == 'up' ? ';asc' : ''), $context['start'], $attachCount, $maxIndex);
+	$context['sub_template'] = 'show_list';
+	$context['default_list'] = 'disregarded_topics';
+}
 
-	// Retrieve some attachments.
+/**
+ * Get the relevant topics in the disregarded list
+ */
+function list_getDisregarded($start, $items_per_page, $sort, $memID)
+{
+	global $smcFunc, $board, $modSettings, $context;
+
+	// Get the list of topics we can see
 	$request = $smcFunc['db_query']('', '
-		SELECT a.id_attach, a.id_msg, a.filename, a.downloads, a.approved, m.id_msg, m.id_topic,
-			m.id_board, m.poster_time, m.subject, b.name
-		FROM {db_prefix}attachments AS a
-			INNER JOIN {db_prefix}messages AS m ON (m.id_msg = a.id_msg)
-			INNER JOIN {db_prefix}boards AS b ON (b.id_board = m.id_board AND {query_see_board})
-		WHERE a.attachment_type = {int:attachment_type}
-			AND a.id_msg != {int:no_message}
-			AND m.id_member = {int:current_member}' . (!empty($board) ? '
-			AND b.id_board = {int:board}' : '') . (!in_array(0, $boardsAllowed) ? '
-			AND b.id_board IN ({array_int:boards_list})' : '') . (!$modSettings['postmod_active'] || $context['user']['is_owner'] ? '' : '
-			AND m.approved = {int:is_approved}') . '
+		SELECT lt.id_topic
+		FROM {db_prefix}log_topics as lt
+			LEFT JOIN {db_prefix}topics as t ON (lt.id_topic = t.id_topic)
+			LEFT JOIN {db_prefix}boards as b ON (t.id_board = b.id_board)
+			LEFT JOIN {db_prefix}messages as m ON (t.id_first_msg = m.id_msg)' . (in_array($sort, array('mem.real_name', 'mem.real_name DESC', 'mem.poster_time', 'mem.poster_time DESC')) ? '
+			LEFT JOIN {db_prefix}members as mem ON (m.id_member = mem.id_member)' : '') . '
+		WHERE lt.id_member = {int:current_member}
+			AND disregarded = 1
+			AND {query_see_board}
 		ORDER BY {raw:sort}
 		LIMIT {int:offset}, {int:limit}',
 		array(
-			'boards_list' => $boardsAllowed,
-			'attachment_type' => 0,
-			'no_message' => 0,
 			'current_member' => $memID,
-			'is_approved' => 1,
-			'board' => $board,
-			'sort' => $sort . ' ' . ($context['sort_direction'] == 'down' ? 'DESC' : 'ASC'),
-			'offset' => $context['start'],
-			'limit' => $maxIndex,
+			'sort' => $sort,
+			'offset' => $start,
+			'limit' => $items_per_page,
 		)
 	);
-	$context['attachments'] = array();
-	while ($row = $smcFunc['db_fetch_assoc']($request))
-	{
-		$row['subject'] = censorText($row['subject']);
 
-		$context['attachments'][] = array(
-			'id' => $row['id_attach'],
-			'filename' => $row['filename'],
-			'downloads' => $row['downloads'],
-			'subject' => $row['subject'],
-			'posted' => timeformat($row['poster_time']),
-			'msg' => $row['id_msg'],
-			'topic' => $row['id_topic'],
-			'board' => $row['id_board'],
-			'board_name' => $row['name'],
-			'approved' => $row['approved'],
-		);
-	}
+	$topics = array();
+	while ($row = $smcFunc['db_fetch_assoc']($request))
+		$topics[] = $row['id_topic'];
+
 	$smcFunc['db_free_result']($request);
+
+	// Any topics found?
+	$topicsInfo = array();
+	if (!empty($topics))
+	{
+		$request = $smcFunc['db_query']('', '
+			SELECT mf.subject, mf.poster_time as started_on, IFNULL(memf.real_name, mf.poster_name) as started_by, ml.poster_time as last_post_on, IFNULL(meml.real_name, ml.poster_name) as last_post_by, t.id_topic
+			FROM {db_prefix}topics AS t
+				INNER JOIN {db_prefix}messages AS ml ON (ml.id_msg = t.id_last_msg)
+				INNER JOIN {db_prefix}messages AS mf ON (mf.id_msg = t.id_first_msg)
+				LEFT JOIN {db_prefix}members AS meml ON (meml.id_member = ml.id_member)
+				LEFT JOIN {db_prefix}members AS memf ON (memf.id_member = mf.id_member)
+			WHERE t.id_topic IN ({array_int:topics})',
+			array(
+				'topics' => $topics,
+			)
+		);
+		while ($row = $smcFunc['db_fetch_assoc']($request))
+			$topicsInfo[] = $row;
+		$smcFunc['db_free_result']($request);
+	}
+
+	return $topicsInfo;
+}
+
+/**
+ * Count the number of topics in the disregarded list
+ *
+ * @param int $memID
+ */
+function list_getNumDisregarded($memID)
+{
+	global $smcFunc, $user_info;
+
+	// Get the total number of attachments they have posted.
+	$request = $smcFunc['db_query']('', '
+		SELECT COUNT(*)
+		FROM {db_prefix}log_topics as lt
+		LEFT JOIN {db_prefix}topics as t ON (lt.id_topic = t.id_topic)
+		LEFT JOIN {db_prefix}boards as b ON (t.id_board = b.id_board)
+		WHERE id_member = {int:current_member}
+			AND disregarded = 1
+			AND {query_see_board}',
+		array(
+			'current_member' => $memID,
+		)
+	);
+	list ($disregardedCount) = $smcFunc['db_fetch_row']($request);
+	$smcFunc['db_free_result']($request);
+
+	return $disregardedCount;
 }
 
 /**
  * Gets the user stats for display
- * 
+ *
  * @param int $memID id_member
  */
 function statPanel($memID)
@@ -634,6 +956,11 @@ function statPanel($memID)
 	$timeHours = floor(($user_profile[$memID]['total_time_logged_in'] % 86400) / 3600);
 	$context['time_logged_in'] = ($timeDays > 0 ? $timeDays . $txt['totalTimeLogged2'] : '') . ($timeHours > 0 ? $timeHours . $txt['totalTimeLogged3'] : '') . floor(($user_profile[$memID]['total_time_logged_in'] % 3600) / 60) . $txt['totalTimeLogged4'];
 	$context['num_posts'] = comma_format($user_profile[$memID]['posts']);
+	// Menu tab
+	$context[$context['profile_menu_name']]['tab_data'] = array(
+		'title' => $txt['statPanel_generalStats'] . ' - ' . $context['member']['name'],
+		'icon' => 'stats_info_hd.png'
+	);
 
 	// Number of topics started.
 	$result = $smcFunc['db_query']('', '
@@ -801,14 +1128,14 @@ function statPanel($memID)
 
 	// Put it in the right order.
 	ksort($context['posts_by_time']);
-	
+
 	// Custom stats (just add a template_layer to add it to the template!)
  	call_integration_hook('integrate_profile_stats', array($memID));
 }
 
 /**
  * @todo needs a description
- * 
+ *
  * @param int $memID id_member
  */
 function tracking($memID)
@@ -832,7 +1159,7 @@ function tracking($memID)
 	$context[$context['profile_menu_name']]['tab_data'] = array(
 		'title' => $txt['tracking'],
 		'description' => $txt['tracking_description'],
-		'icon' => 'profile_sm.png',
+		'icon' => 'profile_hd.png',
 		'tabs' => array(
 			'activity' => array(),
 			'ip' => array(),
@@ -854,7 +1181,7 @@ function tracking($memID)
 
 /**
  * @todo needs a description
- * 
+ *
  * @param int $memID id_member
  */
 function trackActivity($memID)
@@ -1075,7 +1402,7 @@ function trackActivity($memID)
 
 /**
  * Get the number of user errors
- * 
+ *
  * @param string $where
  * @param array $where_vars = array()
  * @return string number of user errors
@@ -1099,7 +1426,7 @@ function list_getUserErrorCount($where, $where_vars = array())
 
 /**
  * @todo needs a description
- * 
+ *
  * @param int $start
  * @param int $items_per_page
  * @param string $sort
@@ -1142,7 +1469,7 @@ function list_getUserErrors($start, $items_per_page, $sort, $where, $where_vars 
 
 /**
  * @todo needs a description
- * 
+ *
  * @param string $where
  * @param array $where_vars
  * @return string count of messages matching the IP
@@ -1167,7 +1494,7 @@ function list_getIPMessageCount($where, $where_vars = array())
 
 /**
  * @todo needs a description
- * 
+ *
  * @param int $start
  * @param int $items_per_page
  * @param string $sort
@@ -1216,7 +1543,7 @@ function list_getIPMessages($start, $items_per_page, $sort, $where, $where_vars 
 
 /**
  * @todo needs a description
- * 
+ *
  * @param int $memID = 0 id_member
  */
 function TrackIP($memID = 0)
@@ -1499,7 +1826,7 @@ function TrackIP($memID = 0)
 
 /**
  * Tracks a users logins.
- * 
+ *
  * @param int $memID = 0 id_member
  */
 function TrackLogins($memID = 0)
@@ -1578,7 +1905,7 @@ function TrackLogins($memID = 0)
 
 /**
  * Callback for trackLogins for counting history.
- * 
+ *
  * @param string $where
  * @param array $where_vars
  * @return string count of messages matching the IP
@@ -1604,7 +1931,7 @@ function list_getLoginCount($where, $where_vars = array())
 
 /**
  * Callback for trackLogins data.
- * 
+ *
  * @param int $start
  * @param int $items_per_page
  * @param string $sort
@@ -1639,7 +1966,7 @@ function list_getLogins($start, $items_per_page, $sort, $where, $where_vars = ar
 
 /**
  * @todo needs a description
- * 
+ *
  * @param int $memID id_member
  */
 function trackEdits($memID)
@@ -1740,7 +2067,7 @@ function trackEdits($memID)
 
 /**
  * How many edits?
- * 
+ *
  * @param int $memID id_member
  * @return string number of profile edits
  */
@@ -1767,7 +2094,7 @@ function list_getProfileEditCount($memID)
 
 /**
  * @todo needs a description
- * 
+ *
  * @param int $start
  * @param int $items_per_page
  * @param string $sort
@@ -1855,7 +2182,7 @@ function list_getProfileEdits($start, $items_per_page, $sort, $memID)
 
 /**
  * @todo needs a description
- * 
+ *
  * @param int $memID id_member
  */
 function showPermissions($memID)
@@ -1891,12 +2218,14 @@ function showPermissions($memID)
 
 	// Load a list of boards for the jump box - except the defaults.
 	$request = $smcFunc['db_query']('order_by_board_order', '
-		SELECT b.id_board, b.name, b.id_profile, b.member_groups, IFNULL(mods.id_member, 0) AS is_mod
+		SELECT b.id_board, b.name, b.id_profile, b.member_groups, IFNULL(mods.id_member, IFNULL(modgs.id_group, 0)) AS is_mod
 		FROM {db_prefix}boards AS b
 			LEFT JOIN {db_prefix}moderators AS mods ON (mods.id_board = b.id_board AND mods.id_member = {int:current_member})
+			LEFT JOIN {db_prefix}moderator_groups AS modgs ON (modgs.id_board = b.id_board AND modgs.id_group IN ({array_int:current_groups}))
 		WHERE {query_see_board}',
 		array(
 			'current_member' => $memID,
+			'current_groups' => $curGroups,
 		)
 	);
 	$context['boards'] = array();
@@ -1986,14 +2315,15 @@ function showPermissions($memID)
 	$request = $smcFunc['db_query']('', '
 		SELECT
 			bp.add_deny, bp.permission, bp.id_group, mg.group_name' . (empty($board) ? '' : ',
-			b.id_profile, CASE WHEN mods.id_member IS NULL THEN 0 ELSE 1 END AS is_moderator') . '
+			b.id_profile, CASE WHEN (mods.id_member IS NULL AND modgs.id_group IS NULL) THEN 0 ELSE 1 END AS is_moderator') . '
 		FROM {db_prefix}board_permissions AS bp' . (empty($board) ? '' : '
 			INNER JOIN {db_prefix}boards AS b ON (b.id_board = {int:current_board})
-			LEFT JOIN {db_prefix}moderators AS mods ON (mods.id_board = b.id_board AND mods.id_member = {int:current_member})') . '
+			LEFT JOIN {db_prefix}moderators AS mods ON (mods.id_board = b.id_board AND mods.id_member = {int:current_member})
+			LEFT JOIN {db_prefix}moderator_groups AS modgs ON (modgs.id_board = b.id_board AND modgs.id_group IN ({array_int:group_list}))') . '
 			LEFT JOIN {db_prefix}membergroups AS mg ON (mg.id_group = bp.id_group)
 		WHERE bp.id_profile = {raw:current_profile}
 			AND bp.id_group IN ({array_int:group_list}' . (empty($board) ? ')' : ', {int:moderator_group})
-			AND (mods.id_member IS NOT NULL OR bp.id_group != {int:moderator_group})'),
+			AND (mods.id_member IS NOT NULL OR modgs.id_group IS NOT NULL OR bp.id_group != {int:moderator_group})'),
 		array(
 			'current_board' => $board,
 			'group_list' => $curGroups,
@@ -2037,7 +2367,7 @@ function showPermissions($memID)
 
 /**
  * View a members warnings?
- * 
+ *
  * @param int $memID id_member
  */
 function viewWarning($memID)
@@ -2092,7 +2422,7 @@ function viewWarning($memID)
 			'reason' => array(
 				'header' => array(
 					'value' => $txt['profile_warning_previous_reason'],
-					'style' => 'width: 50%',
+					'style' => 'width: 50%;',
 				),
 				'data' => array(
 					'db' => 'reason',

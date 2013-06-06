@@ -8,14 +8,14 @@
  *
  * @package SMF
  * @author Simple Machines http://www.simplemachines.org
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
  */
 
 if (!defined('SMF'))
-	die('Hacking attempt...');
+	die('No direct access...');
 
 /**
  * Show the calendar.
@@ -33,6 +33,12 @@ function CalendarMain()
 
 	// Permissions, permissions, permissions.
 	isAllowedTo('calendar_view');
+
+	// Some global template resources.
+	$context['calendar_resources'] = array(
+		'min_year' => $modSettings['cal_minyear'],
+		'max_year' => $modSettings['cal_maxyear'],
+	);
 
 	// Doing something other than calendar viewing?
 	$subActions = array(
@@ -91,11 +97,17 @@ function CalendarMain()
 		'show_birthdays' => in_array($modSettings['cal_showbdays'], array(1, 2)),
 		'show_events' => in_array($modSettings['cal_showevents'], array(1, 2)),
 		'show_holidays' => in_array($modSettings['cal_showholidays'], array(1, 2)),
+		'highlight' => array(
+			'events' => isset($modSettings['cal_highlight_events']) ? $modSettings['cal_highlight_events'] : 0,
+			'holidays' => isset($modSettings['cal_highlight_holidays']) ? $modSettings['cal_highlight_holidays'] : 0,
+			'birthdays' => isset($modSettings['cal_highlight_birthdays']) ? $modSettings['cal_highlight_birthdays'] : 0,
+		),
 		'show_week_num' => true,
-		'short_day_titles' => false,
-		'show_next_prev' => true,
-		'show_week_links' => true,
-		'size' => 'large',
+		'tpl_show_week_num' => !empty($modSettings['cal_week_numbers']),
+		'short_day_titles' => !empty($modSettings['cal_short_days']),
+		'short_month_titles' => !empty($modSettings['cal_short_months']),
+		'show_next_prev' => !empty($modSettings['cal_prev_next_links']),
+		'show_week_links' => isset($modSettings['cal_week_links']) ? $modSettings['cal_week_links'] : 0,
 	);
 
 	// Load up the main view.
@@ -105,15 +117,10 @@ function CalendarMain()
 		$context['calendar_grid_main'] = getCalendarGrid($curPage['month'], $curPage['year'], $calendarOptions);
 
 	// Load up the previous and next months.
-	$calendarOptions['show_birthdays'] = $calendarOptions['show_events'] = $calendarOptions['show_holidays'] = false;
-	$calendarOptions['short_day_titles'] = true;
-	$calendarOptions['show_next_prev'] = false;
-	$calendarOptions['show_week_links'] = false;
-	$calendarOptions['size'] = 'small';
 	$context['calendar_grid_current'] = getCalendarGrid($curPage['month'], $curPage['year'], $calendarOptions);
 	// Only show previous month if it isn't pre-January of the min-year
 	if ($context['calendar_grid_current']['previous_calendar']['year'] > $modSettings['cal_minyear'] || $curPage['month'] != 1)
-		$context['calendar_grid_prev'] = getCalendarGrid($context['calendar_grid_current']['previous_calendar']['month'], $context['calendar_grid_current']['previous_calendar']['year'], $calendarOptions);
+		$context['calendar_grid_prev'] = getCalendarGrid($context['calendar_grid_current']['previous_calendar']['month'], $context['calendar_grid_current']['previous_calendar']['year'], $calendarOptions, true);
 	// Only show next month if it isn't post-December of the max-year
 	if ($context['calendar_grid_current']['next_calendar']['year'] < $modSettings['cal_maxyear'] || $curPage['month'] != 12)
 		$context['calendar_grid_next'] = getCalendarGrid($context['calendar_grid_current']['next_calendar']['month'], $context['calendar_grid_current']['next_calendar']['year'], $calendarOptions);
@@ -124,6 +131,8 @@ function CalendarMain()
 	$context['current_month'] = $curPage['month'];
 	$context['current_year'] = $curPage['year'];
 	$context['show_all_birthdays'] = isset($_GET['showbd']);
+	$context['blocks_disabled'] = !empty($modSettings['cal_disable_prev_next']) ? 1 : 0;
+	$context['tpl_show_week_num'] = !empty($calendarOptions['tpl_show_week_num']) ? 1 : 0;
 
 	// Set the page title to mention the month or week, too
 	$context['page_title'] .= ' - ' . ($context['view_week'] ? sprintf($txt['calendar_week_title'], $context['calendar_grid_main']['week_number'], ($context['calendar_grid_main']['week_number'] == 53 ? $context['current_year'] - 1 : $context['current_year'])) : $txt['months'][$context['current_month']] . ' ' . $context['current_year']);
@@ -144,12 +153,12 @@ function CalendarMain()
 			'url' => $scripturl . '?action=calendar;viewweek;year=' . $context['current_year'] . ';month=' . $context['current_month'] . ';day=' . $context['current_day'],
 			'name' => $txt['calendar_week'] . ' ' . $context['calendar_grid_main']['week_number']
 		);
-		
+
 	// Build the calendar button array.
 	$context['calendar_buttons'] = array(
 		'post_event' => array('test' => 'can_post', 'text' => 'calendar_post_event', 'image' => 'calendarpe.png', 'lang' => true, 'url' => $scripturl . '?action=calendar;sa=post;month=' . $context['current_month'] . ';year=' . $context['current_year'] . ';' . $context['session_var'] . '=' . $context['session_id']),
 	);
-	
+
 	// Allow mods to add additional buttons here
 	call_integration_hook('integrate_calendar_buttons');
 }
@@ -205,7 +214,7 @@ function CalendarPost()
 			$eventOptions = array(
 				'board' => 0,
 				'topic' => 0,
-				'title' => substr($_REQUEST['evtitle'], 0, 60),
+				'title' => $smcFunc['substr']($_REQUEST['evtitle'], 0, 100),
 				'member' => $user_info['id'],
 				'start_date' => sprintf('%04d-%02d-%02d', $_POST['year'], $_POST['month'], $_POST['day']),
 				'span' => isset($_POST['span']) && $_POST['span'] > 0 ? min((int) $modSettings['cal_maxspan'], (int) $_POST['span'] - 1) : 0,
@@ -234,9 +243,9 @@ function CalendarPost()
 				list ($id_board, $id_topic) = $smcFunc['db_fetch_row']($request);
 				$smcFunc['db_free_result']($request);
 			}
-			
+
 			$eventOptions = array(
-				'title' => substr($_REQUEST['evtitle'], 0, 60),
+				'title' => $smcFunc['substr']($_REQUEST['evtitle'], 0, 100),
 				'span' => empty($modSettings['cal_allowspan']) || empty($_POST['span']) || $_POST['span'] == 1 || empty($modSettings['cal_maxspan']) || $_POST['span'] > $modSettings['cal_maxspan'] ? 0 : min((int) $modSettings['cal_maxspan'], (int) $_POST['span'] - 1),
 				'start_date' => strftime('%Y-%m-%d', mktime(0, 0, 0, (int) $_REQUEST['month'], (int) $_REQUEST['day'], (int) $_REQUEST['year'])),
 			);
@@ -337,12 +346,12 @@ function CalendarPost()
  */
 function iCalDownload()
 {
-	global $smcFunc, $sourcedir, $forum_version, $context, $modSettings, $webmaster_email, $mbname;
+	global $smcFunc, $sourcedir, $forum_version, $modSettings, $webmaster_email, $mbname;
 
 	// You can't export if the calendar export feature is off.
 	if (empty($modSettings['cal_export']))
 		fatal_lang_error('calendar_export_off', false);
-	
+
 	// Goes without saying that this is required.
 	if (!isset($_REQUEST['eventid']))
 		fatal_lang_error('no_access', false);
@@ -352,7 +361,7 @@ function iCalDownload()
 
 	// Load up the event in question and check it exists.
 	$event = getEventProperties($_REQUEST['eventid']);
-	
+
 	if ($event === false)
 		fatal_lang_error('no_access', false);
 
@@ -384,18 +393,19 @@ function iCalDownload()
 	$filecontents .= 'PRODID:-//SimpleMachines//SMF ' . (empty($forum_version) ? 2.0 : strtr($forum_version, array('SMF ' => ''))) . '//EN' . "\n";
 	$filecontents .= 'VERSION:2.0' . "\n";
 	$filecontents .= 'BEGIN:VEVENT' . "\n";
+	// @TODO - Should be the members email who created the event rather than $webmaster_email.
 	$filecontents .= 'ORGANIZER;CN="' . $event['realname'] . '":MAILTO:' . $webmaster_email . "\n";
 	$filecontents .= 'DTSTAMP:' . $datestamp . "\n";
 	$filecontents .= 'DTSTART;VALUE=DATE:' . $datestart . "\n";
-	
+
 	// more than one day
 	if ($event['span'] > 1)
 		$filecontents .= 'DTEND;VALUE=DATE:' . $dateend . "\n";
-	
+
 	// event has changed? advance the sequence for this UID
 	if ($event['sequence'] > 0)
 		$filecontents .= 'SEQUENCE:' . $event['sequence'] . "\n";
-	
+
 	$filecontents .= 'SUMMARY:' . implode('', $title);
 	$filecontents .= 'UID:' . $event['eventid'] . '@' . str_replace(' ', '-', $mbname) . "\n";
 	$filecontents .= 'END:VEVENT' . "\n";
@@ -407,7 +417,7 @@ function iCalDownload()
 		@ob_start('ob_gzhandler');
 	else
 		ob_start();
-	
+
 	// Send the file headers
 	header('Pragma: ');
 	header('Cache-Control: no-cache');
@@ -420,7 +430,7 @@ function iCalDownload()
 	header('Content-Disposition: attachment; filename="' . $event['title'] . '.ics"');
 	if (empty($modSettings['enableCompressedOutput']))
 		header('Content-Length: ' . $smcFunc['strlen']($filecontents));
-	
+
 	// This is a calendar item!
 	header('Content-Type: text/calendar');
 
@@ -436,11 +446,16 @@ function iCalDownload()
  */
 function clock()
 {
-	global $settings, $context;
+	global $settings, $context, $scripturl;
+
 	$context['onimg'] = $settings['images_url'] . '/bbc/bbc_bg.png';
 	$context['offimg'] = $settings['images_url'] . '/bbc/bbc_hoverbg.png';
 
 	$context['page_title'] = 'Anyone know what time it is?';
+	$context['linktree'][] = array(
+			'url' => $scripturl . '?action=clock',
+			'name' => 'Clock',
+	);
 	$context['robot_no_index'] = true;
 
 	$omfg = isset($_REQUEST['omfg']);
@@ -448,26 +463,35 @@ function clock()
 
 	loadTemplate('Calendar');
 
-	if ($bcd && !$omfg)
+	if ($bcd)
 	{
 		$context['sub_template'] = 'bcd';
+		$context['linktree'][] = array('url' => $scripturl . '?action=clock;bcd', 'name' => 'BCD');
 		$context['clockicons'] = unserialize(base64_decode('YTo2OntzOjI6ImgxIjthOjI6e2k6MDtpOjI7aToxO2k6MTt9czoyOiJoMiI7YTo0OntpOjA7aTo4O2k6MTtpOjQ7aToyO2k6MjtpOjM7aToxO31zOjI6Im0xIjthOjM6e2k6MDtpOjQ7aToxO2k6MjtpOjI7aToxO31zOjI6Im0yIjthOjQ6e2k6MDtpOjg7aToxO2k6NDtpOjI7aToyO2k6MztpOjE7fXM6MjoiczEiO2E6Mzp7aTowO2k6NDtpOjE7aToyO2k6MjtpOjE7fXM6MjoiczIiO2E6NDp7aTowO2k6ODtpOjE7aTo0O2k6MjtpOjI7aTozO2k6MTt9fQ=='));
 	}
 	elseif (!$omfg && !isset($_REQUEST['time']))
 	{
 		$context['sub_template'] = 'hms';
+		$context['linktree'][] = array('url' => $scripturl . '?action=clock', 'name' => 'Binary');
 		$context['clockicons'] = unserialize(base64_decode('YTozOntzOjE6ImgiO2E6NTp7aTowO2k6MTY7aToxO2k6ODtpOjI7aTo0O2k6MztpOjI7aTo0O2k6MTt9czoxOiJtIjthOjY6e2k6MDtpOjMyO2k6MTtpOjE2O2k6MjtpOjg7aTozO2k6NDtpOjQ7aToyO2k6NTtpOjE7fXM6MToicyI7YTo2OntpOjA7aTozMjtpOjE7aToxNjtpOjI7aTo4O2k6MztpOjQ7aTo0O2k6MjtpOjU7aToxO319'));
 	}
 	elseif ($omfg)
 	{
 		$context['sub_template'] = 'omfg';
+		$context['linktree'][] = array('url' => $scripturl . '?action=clock;omfg', 'name' => 'OMFG');
 		$context['clockicons'] = unserialize(base64_decode('YTo2OntzOjQ6InllYXIiO2E6Nzp7aTowO2k6NjQ7aToxO2k6MzI7aToyO2k6MTY7aTozO2k6ODtpOjQ7aTo0O2k6NTtpOjI7aTo2O2k6MTt9czo1OiJtb250aCI7YTo0OntpOjA7aTo4O2k6MTtpOjQ7aToyO2k6MjtpOjM7aToxO31zOjM6ImRheSI7YTo1OntpOjA7aToxNjtpOjE7aTo4O2k6MjtpOjQ7aTozO2k6MjtpOjQ7aToxO31zOjQ6ImhvdXIiO2E6NTp7aTowO2k6MTY7aToxO2k6ODtpOjI7aTo0O2k6MztpOjI7aTo0O2k6MTt9czozOiJtaW4iO2E6Njp7aTowO2k6MzI7aToxO2k6MTY7aToyO2k6ODtpOjM7aTo0O2k6NDtpOjI7aTo1O2k6MTt9czozOiJzZWMiO2E6Njp7aTowO2k6MzI7aToxO2k6MTY7aToyO2k6ODtpOjM7aTo0O2k6NDtpOjI7aTo1O2k6MTt9fQ=='));
 	}
 	elseif (isset($_REQUEST['time']))
 	{
 		$context['sub_template'] = 'thetime';
 		$time = getdate($_REQUEST['time'] == 'now' ? time() : (int) $_REQUEST['time']);
-
+		$year = $time['year'] % 100;
+		$month = $time['mon'];
+		$day = $time['mday'];
+		$hour = $time['hours'];
+		$min = $time['minutes'];
+		$sec = $time['seconds'];
+		$context['linktree'][] = array('url' => $scripturl . '?action=clock;time=' . $_REQUEST['time'], 'name' => 'Requested Time');
 		$context['clockicons'] = array(
 			'year' => array(
 				64 => false,
@@ -516,13 +540,6 @@ function clock()
 				1  => false
 			),
 		);
-
-		$year = $time['year'] % 100;
-		$month = $time['mon'];
-		$day = $time['mday'];
-		$hour = $time['hours'];
-		$min = $time['minutes'];
-		$sec = $time['seconds'];
 
 		foreach ($context['clockicons'] as $t => $vs)
 			foreach ($vs as $v => $dumb)

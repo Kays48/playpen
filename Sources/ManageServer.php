@@ -50,14 +50,14 @@
  *
  * @package SMF
  * @author Simple Machines http://www.simplemachines.org
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
  */
 
 if (!defined('SMF'))
-	die('Hacking attempt...');
+	die('No direct access...');
 
 /**
  * This is the main dispatcher. Sets up all the available sub-actions, all the tabs and selects
@@ -338,21 +338,27 @@ function ModifyCacheSettings($return_config = false)
 		$detected['memcached'] = $txt['memcached_cache'];
 	if (function_exists('xcache_set'))
 		$detected['xcache'] = $txt['xcache_cache'];
+	if (function_exists('file_put_contents'))
+		$detected['smf'] = $txt['default_cache'];
 
-	// set a message to show what, if anything, we found
+	// set our values to show what, if anything, we found
 	if (empty($detected))
+	{
 		$txt['cache_settings_message'] = $txt['detected_no_caching'];
+		$cache_level = array($txt['cache_off']);
+		$detected['none'] = $txt['cache_off'];
+	}
 	else
+	{
 		$txt['cache_settings_message'] = sprintf($txt['detected_accelerators'], implode(', ', $detected));
-
-	// This is always an option
-	$detected['smf'] = $txt['default_cache'];
+		$cache_level = array($txt['cache_off'], $txt['cache_level1'], $txt['cache_level2'], $txt['cache_level3']);
+	}
 
 	// Define the variables we want to edit.
 	$config_vars = array(
 		// Only a few settings, but they are important
 		array('', $txt['cache_settings_message'], '', 'desc'),
-		array('cache_enable', $txt['cache_enable'], 'file', 'select', array($txt['cache_off'], $txt['cache_level1'], $txt['cache_level2'], $txt['cache_level3']), 'cache_enable'),
+		array('cache_enable', $txt['cache_enable'], 'file', 'select', $cache_level, 'cache_enable'),
 		array('cache_accelerator', $txt['cache_accelerator'], 'file', 'select', $detected),
 		array('cache_memcached', $txt['cache_memcached'], 'file', 'text', $txt['cache_memcached'], 'cache_memcached'),
 		array('cachedir', $txt['cachedir'], 'file', 'text', 36, 'cache_cachedir'),
@@ -384,14 +390,9 @@ function ModifyCacheSettings($return_config = false)
 		redirectexit('action=admin;area=serversettings;sa=cache;' . $context['session_var'] . '=' . $context['session_id']);
 	}
 
-	// if its off, allow them to clear it as well
-	// @todo why only when its off ?
-	if (empty($cache_enable))
-	{
-		loadLanguage('ManageMaintenance');
-		createToken('admin-maint');
-		$context['template_layers'][] = 'clean_cache_button';
-	}
+	loadLanguage('ManageMaintenance');
+	createToken('admin-maint');
+	$context['template_layers'][] = 'clean_cache_button';
 
 	$context['post_url'] = $scripturl . '?action=admin;area=serversettings;sa=cache;save';
 	$context['settings_title'] = $txt['caching_settings'];
@@ -616,7 +617,7 @@ function prepareDBSettingContext(&$config_vars)
 				'size' => !empty($config_var[2]) && !is_array($config_var[2]) ? $config_var[2] : (in_array($config_var[0], array('int', 'float')) ? 6 : 0),
 				'data' => array(),
 				'name' => $config_var[1],
-				'value' => isset($modSettings[$config_var[1]]) ? ($config_var[0] == 'select' ? $modSettings[$config_var[1]] : htmlspecialchars($modSettings[$config_var[1]])) : (in_array($config_var[0], array('int', 'float')) ? 0 : ''),
+				'value' => isset($modSettings[$config_var[1]]) ? ($config_var[0] == 'select' ? $modSettings[$config_var[1]] : htmlspecialchars($modSettings[$config_var[1]])) : (in_array($config_var[0], array('int', 'float')) ? 0 : (!empty($config_var['multiple']) ? serialize(array()) : '')),
 				'disabled' => false,
 				'invalid' => !empty($config_var['invalid']),
 				'javascript' => '',
@@ -938,7 +939,7 @@ function ShowPHPinfoSettings()
 	$info_lines = explode("\n", strip_tags($info_lines, "<tr><td><h2>"));
 	ob_end_clean();
 
-	// remove things that could be considered sensative
+	// remove things that could be considered sensitive
 	$remove = '_COOKIE|Cookie|_GET|_REQUEST|REQUEST_URI|QUERY_STRING|REQUEST_URL|HTTP_REFERER';
 
 	// put all of it into an array

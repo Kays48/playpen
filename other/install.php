@@ -5,7 +5,7 @@
  *
  * @package SMF
  * @author Simple Machines http://www.simplemachines.org
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
@@ -33,7 +33,7 @@ $databases = array(
 		'utf8_support' => true,
 		'utf8_version' => '4.1.0',
 		'utf8_version_check' => 'return mysql_get_server_info();',
-		'utf8_default' => false,
+		'utf8_default' => true,
 		'utf8_required' => false,
 		'alter_support' => true,
 		'validate_prefix' => create_function('&$value', '
@@ -76,6 +76,7 @@ $databases = array(
 		'always_has_db' => true,
 		'utf8_default' => true,
 		'utf8_required' => true,
+		'utf8_support' => false,
 		'validate_prefix' => create_function('&$value', '
 			global $incontext, $txt;
 
@@ -338,7 +339,7 @@ function load_lang_file()
 function load_database()
 {
 	global $db_prefix, $db_connection, $db_character_set, $sourcedir, $language;
-	global $smcFunc, $mbname, $scripturl, $boardurl, $modSettings, $db_type, $db_name, $db_user;
+	global $smcFunc, $mbname, $scripturl, $boardurl, $modSettings, $db_type, $db_name, $db_user, $db_persist;
 
 	if (empty($sourcedir))
 		$sourcedir = dirname(__FILE__) . '/Sources';
@@ -494,10 +495,6 @@ function CheckFilesWritable()
 		'agreement.txt',
 		'Settings.php',
 		'Settings_bak.php'
-	);
-	$extra_files = array(
-		'Themes/classic/index.template.php',
-		'Themes/classic/style.css'
 	);
 	foreach ($incontext['detected_languages'] as $lang => $temp)
 		$extra_files[] = 'Themes/default/languages/' . $lang;
@@ -948,9 +945,9 @@ function ForumSettings()
 		require(dirname(__FILE__) . '/Settings.php');
 
 		// UTF-8 requires a setting to override the language charset.
-		if (isset($_POST['utf8']) && !empty($databases[$db_type]['utf8_support']))
+		if ((!empty($databases[$db_type]['utf8_support']) && !empty($databases[$db_type]['utf8_required'])) || (empty($databases[$db_type]['utf8_required']) && !empty($databases[$db_type]['utf8_support']) && isset($_POST['utf8'])))
 		{
-			if (version_compare($databases[$db_type]['utf8_version'], preg_replace('~\-.+?$~', '', eval($databases[$db_type]['utf8_version_check'])), '>'))
+			if (!empty($databases[$db_type]['utf8_version_check']) && version_compare($databases[$db_type]['utf8_version'], preg_replace('~\-.+?$~', '', eval($databases[$db_type]['utf8_version_check'])), '>'))
 			{
 				$incontext['error'] = sprintf($txt['error_utf8_version'], $databases[$db_type]['utf8_version']);
 				return false;
@@ -1027,6 +1024,7 @@ function DatabasePopulation()
 		'{$smf_version}' => $GLOBALS['current_smf_version'],
 		'{$current_time}' => time(),
 		'{$sched_task_offset}' => 82800 + mt_rand(0, 86399),
+		'{$registration_method}' => isset($_POST['reg_mode']) ? $_POST['reg_mode'] : 0,
 	);
 
 	foreach ($txt as $key => $value)
@@ -1037,8 +1035,7 @@ function DatabasePopulation()
 	$replaces['{$default_reserved_names}'] = strtr($replaces['{$default_reserved_names}'], array('\\\\n' => '\\n'));
 
 	// If the UTF-8 setting was enabled, add it to the table definitions.
-	// @todo Very MySQL specific still
-	if ($db_type == 'mysql' && isset($_POST['utf8']) && !empty($databases[$db_type]['utf8_support']))
+	if (empty($databases[$db_type]['utf8_required']) && isset($_POST['utf8']) && !empty($databases[$db_type]['utf8_support']))
 		$replaces[') ENGINE=MyISAM;'] = ') ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;';
 
 	// Read in the SQL.  Turn this on and that off... internationalize... etc.
@@ -1114,7 +1111,7 @@ function DatabasePopulation()
 	}
 
 	// Make sure UTF will be used globally.
-	if (isset($_POST['utf8']) && !empty($databases[$db_type]['utf8_support']))
+	if ((!empty($databases[$db_type]['utf8_support']) && !empty($databases[$db_type]['utf8_required'])) || (empty($databases[$db_type]['utf8_required']) && !empty($databases[$db_type]['utf8_support']) && isset($_POST['utf8'])))
 		$smcFunc['db_insert']('replace',
 			$db_prefix . 'settings',
 			array(
@@ -1218,7 +1215,7 @@ function DatabasePopulation()
 		$smcFunc['db_optimize_table']($table) != -1 or $db_messed = true;
 
 		// Optimizing one sqlite table, optimizes them all
-		if($db_type == 'sqlite')
+		if ($db_type == 'sqlite')
 			break;
 
 		if (!empty($db_messed))
@@ -1377,7 +1374,7 @@ function AdminAccount()
 					'password_salt' => 'string', 'lngfile' => 'string', 'personal_text' => 'string', 'avatar' => 'string',
 					'member_ip' => 'string', 'member_ip2' => 'string', 'buddy_list' => 'string', 'pm_ignore_list' => 'string',
 					'message_labels' => 'string', 'website_title' => 'string', 'website_url' => 'string', 'location' => 'string',
-					'aim' => 'string', 'icq' => 'string', 'msn' => 'string', 'signature' => 'string', 'usertitle' => 'string', 'secret_question' => 'string',
+					'aim' => 'string', 'icq' => 'string', 'skype' => 'string', 'signature' => 'string', 'usertitle' => 'string', 'secret_question' => 'string',
 					'additional_groups' => 'string', 'ignore_boards' => 'string', 'openid_uri' => 'string',
 				),
 				array(
@@ -1966,11 +1963,11 @@ function updateSettingsFile($vars)
 	return true;
 }
 
-function updateDbLastError() 
+function updateDbLastError()
 {
-	// Write out the db_last_error file with the error timestamp 
+	// Write out the db_last_error file with the error timestamp
 	file_put_contents(dirname(__FILE__) . '/db_last_error.php', '<' . '?' . "php\n" . '$db_last_error = 0;' . "\n" . '?' . '>');
-	
+
 	return true;
 }
 
@@ -2039,60 +2036,63 @@ function template_install_above()
 		<script type="text/javascript" src="Themes/default/scripts/script.js"></script>
 	</head>
 	<body>
-	<div id="header"><div class="frame">
-		<div id="top_section">
-			<h1 class="forumtitle">', $txt['smf_installer'], '</h1>
-			<img id="smflogo" src="Themes/default/images/smflogo.png" alt="Simple Machines Forum" title="Simple Machines Forum" />
+		<div id="header">
+			<div class="frame">
+				<h1 class="forumtitle">', $txt['smf_installer'], '</h1>
+				<img id="smflogo" src="Themes/default/images/smflogo.png" alt="Simple Machines Forum" title="Simple Machines Forum" />
+			</div>
 		</div>
-		<div id="upper_section" class="middletext flow_hidden">
-			<div class="user"></div>
-			<div class="news normaltext">';
+		<div id="wrapper">
+			<div id="upper_section">
+				<div id="inner_section">
+					<div id="inner_wrap">';
 
 	// Have we got a language drop down - if so do it on the first step only.
 	if (!empty($incontext['detected_languages']) && count($incontext['detected_languages']) > 1 && $incontext['current_step'] == 0)
 	{
 		echo '
-				<div class="righttext">
-					<form action="', $installurl, '" method="get">
-						<label for="installer_language">', $txt['installer_language'], ':</label> <select id="installer_language" name="lang_file" onchange="location.href = \'', $installurl, '?lang_file=\' + this.options[this.selectedIndex].value;">';
+						<div class="news">
+							<form action="', $installurl, '" method="get">
+								<label for="installer_language">', $txt['installer_language'], ':</label>
+								<select id="installer_language" name="lang_file" onchange="location.href = \'', $installurl, '?lang_file=\' + this.options[this.selectedIndex].value;">';
 
 		foreach ($incontext['detected_languages'] as $lang => $name)
 			echo '
-							<option', isset($_SESSION['installer_temp_lang']) && $_SESSION['installer_temp_lang'] == $lang ? ' selected="selected"' : '', ' value="', $lang, '">', $name, '</option>';
+									<option', isset($_SESSION['installer_temp_lang']) && $_SESSION['installer_temp_lang'] == $lang ? ' selected="selected"' : '', ' value="', $lang, '">', $name, '</option>';
 
 		echo '
-						</select>
-						<noscript><input type="submit" value="', $txt['installer_language_set'], '" class="button_submit" /></noscript>
-					</form>
-				</div>';
+								</select>
+								<noscript><input type="submit" value="', $txt['installer_language_set'], '" class="button_submit" /></noscript>
+							</form>
+						</div>
+						<hr class="clear" />';
 	}
 
 	echo '
+					</div>
+				</div>
 			</div>
-		</div>
-	</div></div>
-	<div id="content_section"><div class="frame">
-		<div id="main_content_section">
-			<div id="main-steps">
-				<h2>', $txt['upgrade_progress'], '</h2>
-				<ul>';
+			<div id="content_section">
+				<div id="main_content_section">
+					<div id="main_steps">
+						<h2>', $txt['upgrade_progress'], '</h2>
+						<ul>';
 
 	foreach ($incontext['steps'] as $num => $step)
 		echo '
-					<li class="', $num < $incontext['current_step'] ? 'stepdone' : ($num == $incontext['current_step'] ? 'stepcurrent' : 'stepwaiting'), '">', $txt['upgrade_step'], ' ', $step[0], ': ', $step[1], '</li>';
+							<li class="', $num < $incontext['current_step'] ? 'stepdone' : ($num == $incontext['current_step'] ? 'stepcurrent' : 'stepwaiting'), '">', $txt['upgrade_step'], ' ', $step[0], ': ', $step[1], '</li>';
 
 	echo '
-				</ul>
-			</div>
-			<div style="font-size: 12pt; height: 25pt; border: 1px solid black; background: white; float: left; margin-left: 12%; width: 25%;">
-				<div id="overall_text" style="padding-top: 8pt; z-index: 2; color: black; margin-left: -4em; position: absolute; text-align: center; font-weight: bold;">', $incontext['overall_percent'], '%</div>
-				<div id="overall_progress" style="width: ', $incontext['overall_percent'], '%; height: 25pt; z-index: 1; background-color: lime;">&nbsp;</div>
-				<div class="overall_progress">', $txt['upgrade_overall_progress'], '</div>
-			</div>
-			<div id="main_screen" class="clear">
-				<h2>', $incontext['page_title'], '</h2>
-				<div class="panel">
-					<div style="max-height: 560px; overflow: auto;">';
+						</ul>
+					</div>
+					<div id="progress_bar">
+						<div id="overall_text">', $incontext['overall_percent'], '%</div>
+						<div id="overall_progress" style="width: ', $incontext['overall_percent'], '%;">&nbsp;</div>
+						<div class="overall_progress">', $txt['upgrade_overall_progress'], '</div>
+					</div>
+					<div id="main_screen" class="clear">
+						<h2>', $incontext['page_title'], '</h2>
+						<div class="panel">';
 }
 
 function template_install_below()
@@ -2102,16 +2102,16 @@ function template_install_below()
 	if (!empty($incontext['continue']) || !empty($incontext['skip']))
 	{
 		echo '
-						<div class="righttext" style="margin: 1ex;">';
+								<div>';
 
 		if (!empty($incontext['continue']))
 			echo '
-							<input type="submit" id="contbutt" name="contbutt" value="', $txt['upgrade_continue'], '" onclick="return submitThisOnce(this);" class="button_submit" />';
+									<input type="submit" id="contbutt" name="contbutt" value="', $txt['upgrade_continue'], '" onclick="return submitThisOnce(this);" class="button_submit" />';
 		if (!empty($incontext['skip']))
 			echo '
-							<input type="submit" id="skip" name="skip" value="', $txt['upgrade_skip'], '" onclick="return submitThisOnce(this);" class="button_submit" />';
+									<input type="submit" id="skip" name="skip" value="', $txt['upgrade_skip'], '" onclick="return submitThisOnce(this);" class="button_submit" />';
 		echo '
-						</div>';
+								</div>';
 	}
 
 	// Show the closing form tag and other data only if not in the last step
@@ -2120,14 +2120,18 @@ function template_install_below()
 							</form>';
 
 	echo '
+						</div>
 					</div>
 				</div>
 			</div>
 		</div>
-	</div></div>
-	<div id="footer_section"><div class="frame" style="height: 40px;">
-		<div class="smalltext"><a href="http://www.simplemachines.org/" title="Simple Machines Forum" target="_blank" class="new_win">SMF &copy; 2011, Simple Machines</a></div>
-	</div></div>
+		<div id="footer_section">
+			<div class="frame">
+				<ul class="reset">
+					<li class="copyright"><a href="http://www.simplemachines.org/" title="Simple Machines Forum" target="_blank" class="new_win">SMF &copy; 2011, Simple Machines</a></li>
+				</ul>
+			</div>
+		</div>
 	</body>
 </html>';
 }
@@ -2153,9 +2157,6 @@ function template_welcome_message()
 	if (template_warning_divs())
 		echo '
 		<h3>', $txt['install_all_lovely'], '</h3>';
-
-	echo '
-		<div style="height: 100px;"></div>';
 
 	// Say we want the continue button!
 	if (empty($incontext['error']))
@@ -2411,47 +2412,81 @@ function template_forum_settings()
 	template_warning_divs();
 
 	echo '
-		<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 1em 0;">
+		<table style="width: 100%; margin: 1em 0;">
 			<tr>
-				<td width="20%" valign="top" class="textbox"><label for="mbname_input">', $txt['install_settings_name'], ':</label></td>
+				<td class="textbox" style="width: 20%; vertical-align: top;">
+					<label for="mbname_input">', $txt['install_settings_name'], ':</label>
+				</td>
 				<td>
 					<input type="text" name="mbname" id="mbname_input" value="', $txt['install_settings_name_default'], '" size="65" class="input_text" />
 					<div style="font-size: smaller; margin-bottom: 2ex;">', $txt['install_settings_name_info'], '</div>
 				</td>
-			</tr><tr>
-				<td valign="top" class="textbox"><label for="boardurl_input">', $txt['install_settings_url'], ':</label></td>
+			</tr>
+			<tr>
+				<td class="textbox" style="vertical-align: top;">
+					<label for="boardurl_input">', $txt['install_settings_url'], ':</label>
+				</td>
 				<td>
-					<input type="text" name="boardurl" id="boardurl_input" value="', $incontext['detected_url'], '" size="65" class="input_text" /><br />
+					<input type="text" name="boardurl" id="boardurl_input" value="', $incontext['detected_url'], '" size="65" class="input_text" />
+					<br />
 					<div style="font-size: smaller; margin-bottom: 2ex;">', $txt['install_settings_url_info'], '</div>
 				</td>
-			</tr><tr>
-				<td valign="top" class="textbox">', $txt['install_settings_compress'], ':</td>
+			</tr>
+			<tr>
+				<td class="textbox" style="vertical-align: top;">
+					<label for="reg_mode">', $txt['install_settings_reg_mode'], ':</label>
+				</td>
 				<td>
-					<input type="checkbox" name="compress" id="compress_check" checked="checked" class="input_check" /> <label for="compress_check">', $txt['install_settings_compress_title'], '</label><br />
+					<select name="reg_mode" id="reg_mode">
+						<optgroup label="', $txt['install_settings_reg_modes'], ':">
+							<option value="0" selected="selected">', $txt['install_settings_reg_immediate'], '</option>
+							<option value="1">', $txt['install_settings_reg_email'], '</option>
+							<option value="2">', $txt['install_settings_reg_admin'], '</option>
+							<option value="3">', $txt['install_settings_reg_disabled'], '</option>
+						</optgroup>
+					</select>
+					<br />
+					<div style="font-size: smaller; margin-bottom: 2ex;">', $txt['install_settings_reg_mode_info'], '</div>
+				</td>
+			</tr>
+			<tr>
+				<td class="textbox" style="vertical-align: top;">', $txt['install_settings_compress'], ':</td>
+				<td>
+					<input type="checkbox" name="compress" id="compress_check" checked="checked" class="input_check" />&nbsp;
+					<label for="compress_check">', $txt['install_settings_compress_title'], '</label>
+					<br />
 					<div style="font-size: smaller; margin-bottom: 2ex;">', $txt['install_settings_compress_info'], '</div>
 				</td>
-			</tr><tr>
-				<td valign="top" class="textbox">', $txt['install_settings_dbsession'], ':</td>
+			</tr>
+			<tr>
+				<td class="textbox" style="vertical-align: top;">', $txt['install_settings_dbsession'], ':</td>
 				<td>
-					<input type="checkbox" name="dbsession" id="dbsession_check" checked="checked" class="input_check" /> <label for="dbsession_check">', $txt['install_settings_dbsession_title'], '</label><br />
+					<input type="checkbox" name="dbsession" id="dbsession_check" checked="checked" class="input_check" />&nbsp;
+					<label for="dbsession_check">', $txt['install_settings_dbsession_title'], '</label>
+					<br />
 					<div style="font-size: smaller; margin-bottom: 2ex;">', $incontext['test_dbsession'] ? $txt['install_settings_dbsession_info1'] : $txt['install_settings_dbsession_info2'], '</div>
 				</td>
 			</tr>
 			<tr>
-				<td valign="top" class="textbox">', $txt['install_settings_utf8'], ':</td>
+				<td class="textbox" style="vertical-align: top;">', $txt['install_settings_utf8'], ':</td>
 				<td>
-					<input type="checkbox" name="utf8" id="utf8_check"', $incontext['utf8_default'] ? ' checked="checked"' : '', ' class="input_check"', $incontext['utf8_required'] ? ' disabled="disabled"' : '', ' /> <label for="utf8_check">', $txt['install_settings_utf8_title'], '</label><br />
+					<input type="checkbox" name="utf8" id="utf8_check"', $incontext['utf8_default'] ? ' checked="checked"' : '', ' class="input_check"', $incontext['utf8_required'] ? ' disabled="disabled"' : '', ' />&nbsp;
+					<label for="utf8_check">', $txt['install_settings_utf8_title'], '</label>
+					<br />
 					<div style="font-size: smaller; margin-bottom: 2ex;">', $txt['install_settings_utf8_info'], '</div>
 				</td>
 			</tr>
 			<tr>
-				<td valign="top" class="textbox">', $txt['install_settings_stats'], ':</td>
+				<td class="textbox" style="vertical-align: top;">', $txt['install_settings_stats'], ':</td>
 				<td>
-					<input type="checkbox" name="stats" id="stats_check" class="input_check" /> <label for="stats_check">', $txt['install_settings_stats_title'], '</label><br />
+					<input type="checkbox" name="stats" id="stats_check" class="input_check" />&nbsp;
+					<label for="stats_check">', $txt['install_settings_stats_title'], '</label>
+					<br />
 					<div style="font-size: smaller; margin-bottom: 2ex;">', $txt['install_settings_stats_info'], '</div>
 				</td>
 			</tr>
-		</table>';
+		</table>
+	';
 }
 
 // Show results of the database population.

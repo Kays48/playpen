@@ -7,14 +7,14 @@
  *
  * @package SMF
  * @author Simple Machines http://www.simplemachines.org
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
  */
 
 if (!defined('SMF'))
-	die('Hacking attempt...');
+	die('No direct access...');
 
 /**
  * Main entry point for the admin search settings screen.
@@ -73,7 +73,7 @@ function ManageSearch()
 		),
 	);
 
-	// Call the right function for this sub-acton.
+	// Call the right function for this sub-action.
 	$subActions[$_REQUEST['sa']]();
 }
 
@@ -116,8 +116,6 @@ function EditSearchSettings($return_config = false)
 
 	$context['page_title'] = $txt['search_settings_title'];
 	$context['sub_template'] = 'show_settings';
-
-	call_integration_hook('integrate_modify_search_weights', array(&$factors));
 
 	// We'll need this for the settings.
 	require_once($sourcedir . '/ManageServer.php');
@@ -216,66 +214,7 @@ function EditSearchMethod()
 
 	// Detect whether a fulltext index is set.
 	if ($context['supports_fulltext'])
-	{
-		$request = $smcFunc['db_query']('', '
-			SHOW INDEX
-			FROM {db_prefix}messages',
-			array(
-			)
-		);
-		$context['fulltext_index'] = '';
-		if ($request !== false || $smcFunc['db_num_rows']($request) != 0)
-		{
-			while ($row = $smcFunc['db_fetch_assoc']($request))
-				if ($row['Column_name'] == 'body' && (isset($row['Index_type']) && $row['Index_type'] == 'FULLTEXT' || isset($row['Comment']) && $row['Comment'] == 'FULLTEXT'))
-					$context['fulltext_index'][] = $row['Key_name'];
-			$smcFunc['db_free_result']($request);
-
-			if (is_array($context['fulltext_index']))
-				$context['fulltext_index'] = array_unique($context['fulltext_index']);
-		}
-
-		$request = $smcFunc['db_query']('', '
-			SHOW COLUMNS
-			FROM {db_prefix}messages',
-			array(
-			)
-		);
-		if ($request !== false)
-		{
-			while ($row = $smcFunc['db_fetch_assoc']($request))
-				if ($row['Field'] == 'body' && $row['Type'] == 'mediumtext')
-					$context['cannot_create_fulltext'] = true;
-			$smcFunc['db_free_result']($request);
-		}
-
-		if (preg_match('~^`(.+?)`\.(.+?)$~', $db_prefix, $match) !== 0)
-			$request = $smcFunc['db_query']('', '
-				SHOW TABLE STATUS
-				FROM {string:database_name}
-				LIKE {string:table_name}',
-				array(
-					'database_name' => '`' . strtr($match[1], array('`' => '')) . '`',
-					'table_name' => str_replace('_', '\_', $match[2]) . 'messages',
-				)
-			);
-		else
-			$request = $smcFunc['db_query']('', '
-				SHOW TABLE STATUS
-				LIKE {string:table_name}',
-				array(
-					'table_name' => str_replace('_', '\_', $db_prefix) . 'messages',
-				)
-			);
-
-		if ($request !== false)
-		{
-			while ($row = $smcFunc['db_fetch_assoc']($request))
-				if ((isset($row['Type']) && strtolower($row['Type']) != 'myisam') || (isset($row['Engine']) && strtolower($row['Engine']) != 'myisam'))
-					$context['cannot_create_fulltext'] = true;
-			$smcFunc['db_free_result']($request);
-		}
-	}
+		detectFulltextIndex();
 
 	if (!empty($_REQUEST['sa']) && $_REQUEST['sa'] == 'createfulltext')
 	{
@@ -556,7 +495,7 @@ function CreateMessageIndex()
 		);
 		$context['start'] = isset($_REQUEST['start']) ? (int) $_REQUEST['start'] : 0;
 		$context['step'] = isset($_REQUEST['step']) ? (int) $_REQUEST['step'] : 0;
-		
+
 		// admin timeouts are painful when building these long indexes
 		if ($_SESSION['admin_time'] + 3300 < time() && $context['step'] >= 1)
 			$_SESSION['admin_time'] = time();
@@ -736,7 +675,7 @@ function CreateMessageIndex()
 			$context['percentage'] = 80 + round($context['start'] / $index_properties[$context['index_settings']['bytes_per_word']]['max_size'], 3) * 20;
 		}
 	}
-	
+
 	// Step 3: remove words not distinctive enough.
 	if ($context['step'] === 3)
 	{
@@ -802,6 +741,60 @@ function loadSearchAPIs()
 	closedir($dh);
 
 	return $apis;
+}
+
+/**
+ * Checks if the message table already has a fulltext index created and returns the key name
+ * Determines if a db is capable of creating a fulltext index
+ */
+function detectFulltextIndex()
+{
+	global $smcFunc, $context, $db_prefix;
+
+	$request = $smcFunc['db_query']('', '
+		SHOW INDEX
+		FROM {db_prefix}messages',
+		array(
+		)
+	);
+	$context['fulltext_index'] = '';
+	if ($request !== false || $smcFunc['db_num_rows']($request) != 0)
+	{
+		while ($row = $smcFunc['db_fetch_assoc']($request))
+			if ($row['Column_name'] == 'body' && (isset($row['Index_type']) && $row['Index_type'] == 'FULLTEXT' || isset($row['Comment']) && $row['Comment'] == 'FULLTEXT'))
+				$context['fulltext_index'][] = $row['Key_name'];
+		$smcFunc['db_free_result']($request);
+
+		if (is_array($context['fulltext_index']))
+			$context['fulltext_index'] = array_unique($context['fulltext_index']);
+	}
+
+	if (preg_match('~^`(.+?)`\.(.+?)$~', $db_prefix, $match) !== 0)
+		$request = $smcFunc['db_query']('', '
+			SHOW TABLE STATUS
+			FROM {string:database_name}
+			LIKE {string:table_name}',
+			array(
+				'database_name' => '`' . strtr($match[1], array('`' => '')) . '`',
+				'table_name' => str_replace('_', '\_', $match[2]) . 'messages',
+			)
+		);
+	else
+		$request = $smcFunc['db_query']('', '
+			SHOW TABLE STATUS
+			LIKE {string:table_name}',
+			array(
+				'table_name' => str_replace('_', '\_', $db_prefix) . 'messages',
+			)
+		);
+
+	if ($request !== false)
+	{
+		while ($row = $smcFunc['db_fetch_assoc']($request))
+			if ((isset($row['Type']) && strtolower($row['Type']) != 'myisam') || (isset($row['Engine']) && strtolower($row['Engine']) != 'myisam'))
+				$context['cannot_create_fulltext'] = true;
+		$smcFunc['db_free_result']($request);
+	}
 }
 
 ?>

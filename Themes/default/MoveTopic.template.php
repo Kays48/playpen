@@ -4,7 +4,7 @@
  *
  * @package SMF
  * @author Simple Machines
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
@@ -24,7 +24,6 @@ function template_main()
 				<h3 class="catbg">', $txt['move_topic'], '</h3>
 			</div>
 			<div class="windowbg centertext">
-				<span class="topslice"><span></span></span>
 				<div class="content">
 					<div class="move_topic">
 						<dl class="settings">
@@ -92,10 +91,8 @@ function template_main()
 							</dl>
 						</fieldset>
 						<input type="submit" value="', $txt['move_topic'], '" onclick="return submitThisOnce(this);" accesskey="s" class="button_submit" />
-						<br class="clear_right" />
 					</div>
 				</div>
-				<span class="botslice"><span></span></span>
 			</div>';
 
 	if ($context['back_to_topic'])

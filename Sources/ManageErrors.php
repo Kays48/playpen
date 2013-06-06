@@ -8,14 +8,14 @@
  *
  * @package SMF
  * @author Simple Machines http://www.simplemachines.org
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
  */
 
 if (!defined('SMF'))
-	die('Hacking attempt...');
+	die('No direct access...');
 
 /**
  * View the forum's error log.
@@ -148,7 +148,7 @@ function ViewErrorLog()
 				'file' => $row['file'],
 				'line' => $row['line'],
 				'href' => $scripturl . '?action=admin;area=logs;sa=errorlog;file=' . base64_encode($row['file']) . ';line=' . $row['line'],
-				'link' => $linkfile ? '<a href="' . $scripturl . '?action=admin;area=logs;sa=errorlog;file=' . base64_encode($row['file']) . ';line=' . $row['line'] . '" onclick="return reqWin(this.href, 600, 400, false);">' . $row['file'] . '</a>' : $row['file'],
+				'link' => $linkfile ? '<a href="' . $scripturl . '?action=admin;area=logs;sa=errorlog;file=' . base64_encode($row['file']) . ';line=' . $row['line'] . '" onclick="return reqWin(this.href, 600, 480, false);">' . $row['file'] . '</a>' : $row['file'],
 				'search' => base64_encode($row['file']),
 			);
 		}
@@ -324,24 +324,29 @@ function deleteErrors()
 /**
  * View a file specified in $_REQUEST['file'], with php highlighting on it
  * Preconditions:
- * file must be readable,
- * full file path must be base64 encoded,
- * user must have admin_forum permission.
+ *  - file must be readable,
+ *  - full file path must be base64 encoded,
+ *  - user must have admin_forum permission.
  * The line number number is specified by $_REQUEST['line']...
  * The function will try to get the 20 lines before and after the specified line.
  */
 function ViewFile()
 {
-	global $context, $txt, $boarddir, $sourcedir;
+	global $context, $txt, $boarddir, $sourcedir, $cachedir;
 	// Check for the administrative permission to do this.
 	isAllowedTo('admin_forum');
 
-	// decode the file and get the line
-	$file = base64_decode($_REQUEST['file']);
+	// Decode the file and get the line
+	$file = realpath(base64_decode($_REQUEST['file']));
+	$real_board = realpath($boarddir);
+	$real_source = realpath($sourcedir);
+	$real_cache = realpath($cachedir);
+	$basename = strtolower(basename($file));
+	$ext = strrchr($basename, '.');
 	$line = isset($_REQUEST['line']) ? (int) $_REQUEST['line'] : 0;
 
 	// Make sure the file we are looking for is one they are allowed to look at
-	if (!is_readable($file) || (strpos($file, '../') !== false && ( strpos($file, $boarddir) === false || strpos($file, $sourcedir) === false)))
+	if ($ext != '.php' || (strpos($file, $real_board) === false && strpos($file, $real_source) === false) || ($basename == 'settings.php' || $basename == 'settings_bak.php') || strpos($file, $real_cache) !== false || !is_readable($file))
 		fatal_lang_error('error_bad_file', true, array(htmlspecialchars($file)));
 
 	// get the min and max lines

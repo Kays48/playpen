@@ -8,14 +8,14 @@
  * @package SMF
  * @author Simple Machines
  *
- * @copyright 2011 Simple Machines
+ * @copyright 2012 Simple Machines
  * @license http://www.simplemachines.org/about/smf/license.php BSD
  *
  * @version 2.1 Alpha 1
  */
 
 if (!defined('SMF'))
-	die('Hacking attempt...');
+	die('No direct access...');
 
 /**
  * The main admin handling function.
@@ -25,12 +25,12 @@ if (!defined('SMF'))
  */
 function AdminMain()
 {
-	global $txt, $context, $scripturl, $sc, $modSettings, $user_info, $settings, $sourcedir, $options, $smcFunc, $boarddir;
+	global $txt, $context, $scripturl, $modSettings, $settings, $sourcedir, $options, $boarddir;
 
 	// Load the language and templates....
 	loadLanguage('Admin');
 	loadTemplate('Admin', 'admin');
-	loadJavascriptFile('scripts/admin.js?alp21', array('default_theme' => true));
+	loadJavascriptFile('admin.js', array('default_theme' => true), 'admin.js');
 
 	// No indexing evil stuff.
 	$context['robot_no_index'] = true;
@@ -39,14 +39,6 @@ function AdminMain()
 
 	// Some preferences.
 	$context['admin_preferences'] = !empty($options['admin_preferences']) ? unserialize($options['admin_preferences']) : array();
-	$context['hooks_exist'] = false;
-	foreach ($modSettings as $key => $setting)
-	if (strpos($key, 'integrate') === 0)
-		if (!empty($setting))
-		{
-			$context['hooks_exist'] = true;
-			break;
-		}
 
 	// Define all the menu structure - see Subs-Menu.php for details!
 	$admin_areas = array(
@@ -189,8 +181,8 @@ function AdminMain()
 					'function' => 'ModifyModSettings',
 					'icon' => 'modifications.png',
 					'subsections' => array(
-						'hooks' => array($txt['hooks_title_list'], 'enabled' => $context['hooks_exist']),
 						'general' => array($txt['mods_cat_modifications_misc']),
+						'hooks' => array($txt['hooks_title_list']),
 						// Mod Authors for a "ADD AFTER" on this line. Ensure you end your change with a comma. For example:
 						// 'shout' => array($txt['shout']),
 						// Note the comma!! The setting with automatically appear with the first mod to be added.
@@ -226,6 +218,14 @@ function AdminMain()
 						'censor' => array($txt['admin_censored_words']),
 						'topics' => array($txt['manageposts_topic_settings']),
 					),
+				),
+				'managedrafts' => array(
+					'label' => $txt['manage_drafts'],
+					'file' => 'Drafts.php',
+					'function' => 'ModifyDraftSettings',
+					'icon' => 'logs.png',
+					'permission' => array('admin_forum'),
+					'enabled' => in_array('dr', $context['admin_features']),
 				),
 				'managecalendar' => array(
 					'label' => $txt['manage_calendar'],
@@ -457,9 +457,6 @@ function AdminMain()
 		}
 	}
 
-	// Let them modify admin areas easily.
-	call_integration_hook('integrate_admin_areas', array(&$admin_areas));
-
 	// Make sure the administrator has a valid session...
 	validateSession();
 
@@ -513,7 +510,7 @@ function AdminMain()
 */
 function AdminHome()
 {
-	global $sourcedir, $forum_version, $txt, $scripturl, $context, $user_info, $boardurl, $modSettings, $smcFunc;
+	global $sourcedir, $forum_version, $txt, $scripturl, $context, $user_info;
 
 	// You have to be able to do at least one of the below to see this page.
 	isAllowedTo(array('admin_forum', 'manage_permissions', 'moderate_forum', 'manage_membergroups', 'manage_bans', 'send_mail', 'edit_news', 'manage_boards', 'manage_smileys', 'manage_attachments'));
@@ -555,6 +552,15 @@ function AdminHome()
 
 	$context['sub_template'] = $context['admin_area'] == 'credits' ? 'credits' : 'admin';
 	$context['page_title'] = $context['admin_area'] == 'credits' ? $txt['support_credits_title'] : $txt['admin_center'];
+	if ($context['admin_area'] != 'credits')
+		$context[$context['admin_menu_name']]['tab_data'] = array(
+			'title' => $txt['admin_center'],
+			'help' => '',
+			'description' => '
+				<strong>' . $txt['hello_guest'] . ' ' . $context['user']['name'] . '!</strong>
+				' . sprintf($txt['admin_main_welcome'], $txt['admin_center'], $txt['help'], $txt['help']),
+		);
+
 
 	// The format of this array is: permission, action, title, description, icon.
 	$quick_admin_tasks = array(
@@ -867,7 +873,6 @@ function AdminSearchMember()
 
 /**
  * This file allows the user to search the SM online manual for a little of help.
- * @todo wiki search
  */
 function AdminSearchOM()
 {
@@ -997,7 +1002,7 @@ function AdminEndSession()
 		if (strpos($key, '-admin') !== false)
 			unset($_SESSION['token'][$key]);
 
-	redirectexit('?action=admin');
+	redirectexit('action=admin');
 }
 
 ?>
